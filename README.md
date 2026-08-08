@@ -7,6 +7,8 @@ Dispositivo compacto de monitoreo ambiental para interiores, basado en ESP32, co
 ![PCB](https://img.shields.io/badge/hardware-PCB%20v1.5-9cf)
 ![Licencia](https://img.shields.io/badge/licencia-MIT-green)
 
+![TARS en pruebas de laboratorio](docs/dispositivo-campo.jpg)
+
 ## Descripción
 
 TARS es un dispositivo portátil de escritorio para monitoreo ambiental en interiores: temperatura, humedad, luminosidad y ruido, con una pantalla OLED que muestra los datos en tiempo real y un botón para navegar entre vistas. Se alimenta por USB-C, con un circuito UPS que administra la carga de la batería y entrega los 5V regulados necesarios para el sistema. El firmware usa una arquitectura de máquina de estados modular, y los datos se envían periódicamente a un broker FIWARE Orion Context Broker.
@@ -59,12 +61,24 @@ TARS/
 | Botón pulsador | Navegación de pantallas | GPIO digital |
 | Circuito UPS + USB-C | Carga y regulación a 5V | — |
 
-### PCB v1.5
+## Evolución del proyecto
 
-Diseño propio en Altium Designer, con conector USB-C integrado para carga y programación. Evolucionó desde el prototipo original en breadboard (TARS_V1, Código 106394), enfocado en reducir el tamaño y facilitar el uso como dispositivo de escritorio.
+TARS partió de un prototipo funcional en breadboard, evaluado en Ecovilla UPB, y evolucionó hacia una PCB propia diseñada en Altium para reducir tamaño y facilitar el uso como dispositivo de escritorio.
 
-![PCB TARS v1.5](docs/pcb-v1.5.jpg)
-![Esquemático](docs/esquematico.png)
+<table>
+<tr>
+<td><img src="docs/prototipo-breadboard.jpg" alt="Prototipo en breadboard" width="400"/><br/><sub>Prototipo inicial en breadboard</sub></td>
+<td><img src="docs/pcb-v1.5.jpg" alt="PCB TARS v1.5" width="400"/><br/><sub>PCB v1.5 con conector USB-C</sub></td>
+</tr>
+</table>
+
+### Esquemático
+
+![Esquemático PCB v1.5](docs/esquematico.jpeg)
+
+### Interfaz OLED
+
+![Pantalla OLED de TARS](docs/pantalla-oled.jpg)
 
 ## Instalación
 
@@ -80,7 +94,7 @@ Diseño propio en Altium Designer, con conector USB-C integrado para carga y pro
 
 ## Estado del proyecto
 
-El sensor de calidad de aire (PM1.0/2.5/10) está integrado en el firmware pero **aún en fase experimental** — no forma parte del conjunto de sensores oficial del dispositivo hasta validar su desempeño y consumo energético dentro del presupuesto del UPS.
+El sensor de calidad de aire (PM1.0/2.5/10) está integrado en el firmware pero **aún en fase experimental** — actualmente en pruebas de laboratorio, validando desempeño y consumo energético dentro del presupuesto del UPS antes de integrarlo al conjunto de sensores oficial.
 
 ## Créditos
 
