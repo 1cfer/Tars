@@ -1,41 +1,52 @@
-# TARS — Monitor Ambiental Portátil ESP32
+# TARS — Sistema Modular de Monitoreo Ambiental Portátil basado en ESP32
 
-Dispositivo compacto de monitoreo ambiental para interiores, basado en ESP32, con pantalla OLED, navegación por botón físico y carga USB-C con gestión de batería (UPS). Desarrollado en el Semillero AgeVital, Universidad Pontificia Bolivariana.
+Dispositivo modular de monitoreo ambiental para interiores, basado en ESP32, con pantalla OLED, navegación por botón físico y firmware gobernado por una máquina de estados. Envía sus datos periódicamente a la plataforma en la nube MOREHA, construida sobre el estándar FIWARE. Desarrollado en el Semillero AgeVital, Universidad Pontificia Bolivariana.
 
 ![Plataforma](https://img.shields.io/badge/plataforma-ESP32-blue)
 ![Lenguaje](https://img.shields.io/badge/lenguaje-C++-orange)
 ![PCB](https://img.shields.io/badge/hardware-PCB%20v1.5-9cf)
+![Estándar](https://img.shields.io/badge/estándar-FIWARE-orange)
 ![Licencia](https://img.shields.io/badge/licencia-MIT-green)
 
-![TARS en pruebas de laboratorio](docs/dispositivo-campo.jpg)
+![Lote de dispositivos TARS](docs/3-tars.jpg)
 
 ## Descripción
 
-TARS es un dispositivo portátil de escritorio para monitoreo ambiental en interiores: temperatura, humedad, luminosidad y ruido, con una pantalla OLED que muestra los datos en tiempo real y un botón para navegar entre vistas. Se alimenta por USB-C, con un circuito UPS que administra la carga de la batería y entrega los 5V regulados necesarios para el sistema. El firmware usa una arquitectura de máquina de estados modular, y los datos se envían periódicamente a un broker FIWARE Orion Context Broker.
+TARS mide temperatura, humedad, luminosidad y ruido, y muestra los datos en tiempo real en una pantalla OLED con navegación por botón. El firmware usa una arquitectura de máquina de estados modular, y los datos se transmiten de forma segura hacia `moreha.com.co` mediante autenticación OAuth2 y paso por PEP Proxy, siguiendo el flujo de FIWARE (Keyrock → Wilma → Orion Context Broker).
 
 ## Características
 
 - 🌡️ Temperatura y humedad (HDC1080, I2C)
-- 💡 Luminosidad calibrada (DFRobot B-LUX-V30B, con filtro de mediana + rechazo de picos)
+- 💡 Luminosidad calibrada (DFRobot B-LUX-V30B, con filtro de mediana + descarte de picos)
 - 🔊 Nivel de ruido (sensor analógico calibrado)
-- 🧪 *(Experimental)* Calidad de aire — PM1.0 / PM2.5 / PM10 (DFRobot SEN0460), en evaluación para integración futura
+- 🧪 *(Experimental)* Calidad de aire — PM1.0 / PM2.5 / PM10 (DFRobot SEN0460), en evaluación energética y de laboratorio
+- 🔌 Modularidad y expansión I2C: espacio físico y líneas disponibles en la placa para incorporar nuevos sensores I2C
 - 🖥️ Pantalla OLED con navegación multi-pantalla por botón físico (pulsación corta/larga)
-- 🔋 Carga USB-C con circuito UPS: gestiona batería y entrega 5V regulados al sistema
-- 📡 Envío periódico a FIWARE Orion Context Broker con autenticación OAuth2 (Keyrock)
-- ⚙️ Modo desarrollador con portal web de configuración OTA (WiFi, intervalos, servidor)
-- 🔧 PCB propia (v1.5) con conector USB-C, diseñada en Altium Designer
+- 📡 Conectividad IoT industrial: envío periódico con autenticación OAuth2 y PEP Proxy
+
+### Expansión I2C
+
+La placa reserva espacio físico y líneas de conexión libres para incorporar fácilmente un sensor adicional, siempre que use el protocolo I2C.
+
+![Espacio de expansión I2C](docs/4-i2c.jpg)
+
+### Sensor de calidad de aire (experimental)
+
+Integración en curso del sensor PM1.0 / PM2.5 / PM10 (DFRobot SEN0460), actualmente en fase de evaluación energética y de laboratorio.
+
+![Sensor de calidad de aire en fase experimental](docs/5-pm.jpg)
 
 ## Arquitectura del firmware
 
 ```
 StateMachine
-├── EstadoINICIO       → conexión WiFi, primer boot
-├── EstadoLECTURA       → lectura periódica de sensores + refresco de pantalla
-├── EstadoENVIO         → PATCH a Orion / POST a agente Flask
-└── EstadoDESARROLLADOR → portal web de configuración (AP o STA)
+├── EstadoINICIO        → conexión WiFi, primer boot
+├── EstadoLECTURA        → lectura periódica de sensores + refresco de pantalla
+├── EstadoENVIO           → autenticación OAuth2 + PATCH a Orion vía Wilma
+└── EstadoDESARROLLADOR  → modo de diagnóstico y configuración
 ```
 
-Cada sensor se lee y valida en `SensorManager`, con filtros de rango específicos por sensor (ej. descarte de lecturas fuera de rango físico en HDC1080, filtro de mediana + salto máximo en el sensor de luz para evitar picos por transición de auto-ganancia). Las lecturas se acumulan para promedio durante el intervalo de envío y se serializan en `PayloadBuilder` siguiendo el modelo de entidades NGSI de FIWARE.
+El procesamiento local de sensores incluye filtros digitales — filtro de mediana y descarte de picos extremos — aplicados especialmente al sensor de luz, para evitar transiciones erróneas causadas por lecturas espurias.
 
 ## Estructura del repositorio
 
@@ -43,7 +54,7 @@ Cada sensor se lee y valida en `SensorManager`, con filtros de rango específico
 TARS/
 ├── firmware/
 │   └── TARS/              → sketch principal (Arduino/ESP32)
-├── hardware/                → esquemáticos y diseño de PCB (Altium)
+├── hardware/                → esquemáticos y diseño de PCB
 ├── docs/                    → capturas, fotos, diagramas
 ├── README.md
 └── LICENSE
@@ -56,49 +67,89 @@ TARS/
 | ESP32 DevKit | Controlador principal | — |
 | HDC1080 | Temperatura y humedad | I2C |
 | DFRobot B-LUX-V30B | Luminosidad | I2C |
+| DFRobot SEN0460 *(experimental)* | Calidad de aire (PM1.0/2.5/10) | I2C |
 | Sensor de sonido (analógico) | Nivel de ruido | ADC |
-| OLED SSD1306 128x64 | Interfaz visual | I2C |
+| OLED SSD1306 | Interfaz visual | I2C |
 | Botón pulsador | Navegación de pantallas | GPIO digital |
-| Circuito UPS + USB-C | Carga y regulación a 5V | — |
+| Batería LiPo 1000 mAh + módulo UPS-LIPO-2 | Alimentación y carga | — |
 
-## Evolución del proyecto
+## Evolución del hardware
 
-TARS partió de un prototipo funcional en breadboard, evaluado en Ecovilla UPB, y evolucionó hacia una PCB propia diseñada en Altium para reducir tamaño y facilitar el uso como dispositivo de escritorio.
+TARS ha pasado por tres etapas de maduración, desde un prototipo de pruebas hasta una placa totalmente integrada.
 
 <table>
 <tr>
-<td><img src="docs/prototipo-breadboard.jpg" alt="Prototipo en breadboard" width="400"/><br/><sub>Prototipo inicial en breadboard</sub></td>
-<td><img src="docs/pcb-v1.5.jpg" alt="PCB TARS v1.5" width="400"/><br/><sub>PCB v1.5 con conector USB-C</sub></td>
+<td><img src="docs/1-proto.jpg" alt="Prototipo en breadboard" width="400"/><br/><sub>Fase 1 — Prototipo inicial (breadboard), evaluado en Ecovilla UPB</sub></td>
+<td><img src="docs/2-pcbv1.jpg" alt="PCB TARS v1.5" width="400"/><br/><sub>Fase 2 — PCB v1.5 (actual), shield para ESP32 DevKit</sub></td>
 </tr>
 </table>
 
-### Esquemático
+![Nueva PCB integrada de siguiente generación](docs/6-pcbv2.jpg)
+<p><sub>Fase 3 — Nueva PCB integrada: ESP32 soldado, UPS embebido y USB-C nativo, sin necesidad de placas adicionales</sub></p>
 
-![Esquemático PCB v1.5](docs/esquematico.jpeg)
+| Fase | Formato | Alimentación | Integración |
+|---|---|---|---|
+| 1. Prototipo | Protoboard | Externa / provisional | Ninguna, cableado expuesto |
+| 2. PCB v1.5 (actual) | Shield para ESP32 DevKit | Batería LiPo 1000 mAh + UPS externo (UPS-LIPO-2) | Headers hembra, conectores JST |
+| 3. PCB v2 (siguiente gen.) | Placa integrada compacta | UPS embebido + USB-C nativo | ESP32 soldado, todo en una superficie |
 
-### Interfaz OLED
+## Protocolo de transmisión de datos (MOREHA)
 
-![Pantalla OLED de TARS](docs/pantalla-oled.jpg)
+TARS transmite hacia `moreha.com.co` siguiendo el flujo de seguridad de FIWARE, en dos pasos.
+
+**Paso 1 — Autenticación OAuth2 (Keyrock):**
+
+```
+POST http://moreha.com.co:7000/oauth2/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=password
+client_id=<CLIENT_ID>
+client_secret=<CLIENT_SECRET>
+username=<DEVICE_USERNAME>
+password=<DEVICE_PASSWORD>
+```
+
+La respuesta exitosa devuelve un `access_token` temporal.
+
+**Paso 2 — Transmisión segura (PEP Proxy Wilma → Orion Context Broker):**
+
+```
+PATCH http://moreha.com.co:1027/v2/entities/{deviceId}/attrs
+Authorization: Bearer <access_token>
+Content-Type: application/json
+
+{
+  "temperature": { "value": 23.4, "type": "Number" },
+  "humidity": { "value": 55.2, "type": "Number" },
+  "noise": { "value": 41.0, "type": "Number" },
+  "luminosity": { "value": 320, "type": "Number" }
+}
+```
+
+Wilma valida el token con Keyrock y, si es correcto, autoriza el paso hacia Orion Context Broker. QuantumLeap y CrateDB gestionan el histórico, disponible finalmente en Dashboards de Grafana.
+
+![Arquitectura del sistema TARS - MOREHA / FIWARE](docs/7-arquitectura.png)
 
 ## Instalación
 
 1. Instala las librerías necesarias desde el Gestor de Librerías del IDE de Arduino:
    - `Adafruit GFX Library`, `Adafruit SSD1306`
    - `ArduinoJson`
-   - Librería `ClosedCube_HDC1080`
-   - Librería `DFRobot_B_LUX_V30B`
+   - `ClosedCube_HDC1080`
+   - `DFRobot_B_LUX_V30B`
 2. Abre `firmware/TARS/TARS.ino`
 3. Selecciona la placa ESP32 en `Herramientas > Placa`
 4. Sube el código
-5. En el primer arranque, conéctate al AP generado y configura tu red WiFi desde el portal de configuración
+5. En el primer arranque, conéctate al portal cautivo local y configura la red WiFi del dispositivo
 
 ## Estado del proyecto
 
-El sensor de calidad de aire (PM1.0/2.5/10) está integrado en el firmware pero **aún en fase experimental** — actualmente en pruebas de laboratorio, validando desempeño y consumo energético dentro del presupuesto del UPS antes de integrarlo al conjunto de sensores oficial.
+El sensor de calidad de aire (PM1.0/2.5/10) está en fase experimental, en pruebas de laboratorio y validación de consumo energético antes de integrarlo al conjunto de sensores oficial. La PCB v1.5 es la placa con la que operan actualmente todos los dispositivos TARS construidos hasta la fecha; la PCB v2 integrada está en desarrollo como siguiente generación.
 
 ## Créditos
 
-Proyecto desarrollado por [Fer](https://github.com/1cfer) — Semillero AgeVital, Universidad Pontificia Bolivariana. Prototipo original (TARS_V1) supervisado por el tutor Henry Andrade Caicedo, evaluado en Ecovilla UPB.
+Desarrollado en el Semillero AgeVital, Universidad Pontificia Bolivariana. Supervisión técnica: Henry Andrade Caicedo. Desarrollo: Fer Castro.
 
 ## Licencia
 
