@@ -44,7 +44,7 @@ TARS partió de un prototipo de pruebas hasta llegar a la PCB con la que operan 
 
 <table>
 <tr>
-<td align="center"><img src="docs/1-proto.jpg" alt="Prototipo en breadboard" width="300"/><br/><sub><strong>Fase 1</strong> — Prototipo inicial en breadboard, cableado suelto, evaluado en Ecovilla UPB</sub></td>
+<td align="center"><img src="docs/1-proto.jpg" alt="Prototipo en breadboard" width="300"/><br/><sub><strong>Fase 1</strong> — Prototipo inicial en breadboard, cableado suelto</sub></td>
 <td align="center"><img src="docs/2a-pcbv1-vacia.jpg" alt="PCB TARS actual sin componentes" width="300"/><br/><sub><strong>Fase 2</strong> — PCB actual, sin componentes montados</sub></td>
 <td align="center"><img src="docs/2-pcbv1.jpg" alt="PCB TARS actual con componentes conectados" width="300"/><br/><sub><strong>Fase 2</strong> — PCB actual, con sensores y componentes internos</sub></td>
 </tr>
