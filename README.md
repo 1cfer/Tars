@@ -8,35 +8,62 @@ Dispositivo modular de monitoreo ambiental para interiores, basado en ESP32, con
 ![Estándar](https://img.shields.io/badge/estándar-FIWARE-orange)
 ![Licencia](https://img.shields.io/badge/licencia-MIT-green)
 
-![Lote de dispositivos TARS](docs/3-tars.jpg)
+![Lote de dispositivos TARS ensamblados](docs/3-tars.jpg)
 
 ## Descripción
 
 TARS mide temperatura, humedad, luminosidad y ruido, y muestra los datos en tiempo real en una pantalla OLED con navegación por botón. El firmware usa una arquitectura de máquina de estados modular, y los datos se transmiten de forma segura hacia `moreha.com.co` mediante autenticación OAuth2 y paso por PEP Proxy, siguiendo el flujo de FIWARE (Keyrock → Wilma → Orion Context Broker).
 
-## Características
+## Características técnicas
 
 - 🌡️ Temperatura y humedad (HDC1080, I2C)
 - 💡 Luminosidad calibrada (DFRobot B-LUX-V30B, con filtro de mediana + descarte de picos)
 - 🔊 Nivel de ruido (sensor analógico calibrado)
 - 🧪 *(Experimental)* Calidad de aire — PM1.0 / PM2.5 / PM10 (DFRobot SEN0460), en evaluación energética y de laboratorio
-- 🔌 Modularidad y expansión I2C: espacio físico y líneas disponibles en la placa para incorporar nuevos sensores I2C
+- 🔌 Modularidad y expansión por bus I2C: espacio físico y líneas disponibles en la placa para incorporar nuevos sensores
 - 🖥️ Pantalla OLED con navegación multi-pantalla por botón físico (pulsación corta/larga)
 - 📡 Conectividad IoT industrial: envío periódico con autenticación OAuth2 y PEP Proxy
 
-### Expansión I2C
+### Expansión por bus I2C
 
 La placa reserva espacio físico y líneas de conexión libres para incorporar fácilmente un sensor adicional, siempre que use el protocolo I2C.
 
-![Espacio de expansión I2C](docs/4-i2c.jpg)
+![Puerto I2C libre para expansión de sensores](docs/4-i2c.jpg)
 
 ### Sensor de calidad de aire (experimental)
 
 Integración en curso del sensor PM1.0 / PM2.5 / PM10 (DFRobot SEN0460), actualmente en fase de evaluación energética y de laboratorio.
 
-![Sensor de calidad de aire en fase experimental](docs/5-pm.jpg)
+![TARS con sensor experimental de calidad de aire conectado](docs/5-pm.jpg)
 
-## Arquitectura del firmware
+## Evolución del hardware
+
+TARS ha pasado por tres etapas de maduración, desde un prototipo de pruebas hasta una placa totalmente integrada.
+
+<table>
+<tr>
+<td align="center"><img src="docs/1-proto.jpg" alt="Prototipo en breadboard" width="380"/><br/><sub><strong>Fase 1</strong> — Prototipo inicial en breadboard, cableado suelto, evaluado en Ecovilla UPB</sub></td>
+<td align="center"><img src="docs/2-pcbv1.jpg" alt="PCB TARS v1.5" width="380"/><br/><sub><strong>Fase 2</strong> — PCB actual (v1.5), ESP32 sobre headers</sub></td>
+</tr>
+</table>
+
+<p align="center">
+  <img src="docs/6-pcbv2.jpg" alt="Nueva PCB integrada de siguiente generación" width="420"/>
+  <br/>
+  <sub><strong>Fase 3</strong> — Nueva PCB integrada: ESP32, USB-C y UPS nativos en una sola placa</sub>
+</p>
+
+| Fase | Formato | Alimentación | Integración |
+|---|---|---|---|
+| 1. Prototipo | Protoboard | Externa / provisional | Ninguna, cableado expuesto |
+| 2. PCB v1.5 (actual) | Módulo ESP32 sobre headers | Batería LiPo 1000 mAh + UPS externa (UPS-LIPO-2) | Headers hembra, conectores JST |
+| 3. PCB v2 (siguiente gen.) | Placa integrada compacta | UPS embebida + USB-C nativo | ESP32 soldado, todo en una superficie |
+
+La **PCB v1.5** es la placa con la que operan actualmente todos los dispositivos TARS construidos hasta la fecha: monta la ESP32 como módulo sobre headers hembra, enlaza los sensores mediante conectores JST, y se alimenta con una batería de polímero de litio de 1000 mAh gestionada por una UPS externa (UPS-LIPO-2).
+
+## Arquitectura de firmware
+
+El firmware corre sobre una **máquina de estados modular**:
 
 ```
 StateMachine
@@ -46,54 +73,9 @@ StateMachine
 └── EstadoDESARROLLADOR  → modo de diagnóstico y configuración
 ```
 
-El procesamiento local de sensores incluye filtros digitales — filtro de mediana y descarte de picos extremos — aplicados especialmente al sensor de luz, para evitar transiciones erróneas causadas por lecturas espurias.
+El procesamiento local de sensores incluye filtros digitales — **filtro de mediana** y **descarte de picos extremos** — aplicados especialmente al sensor de luminosidad, para evitar transiciones erróneas en pantalla causadas por lecturas espurias.
 
-## Estructura del repositorio
-
-```
-TARS/
-├── firmware/
-│   └── TARS/              → sketch principal (Arduino/ESP32)
-├── hardware/                → esquemáticos y diseño de PCB
-├── docs/                    → capturas, fotos, diagramas
-├── README.md
-└── LICENSE
-```
-
-## Hardware
-
-| Componente | Función | Conexión |
-|---|---|---|
-| ESP32 DevKit | Controlador principal | — |
-| HDC1080 | Temperatura y humedad | I2C |
-| DFRobot B-LUX-V30B | Luminosidad | I2C |
-| DFRobot SEN0460 *(experimental)* | Calidad de aire (PM1.0/2.5/10) | I2C |
-| Sensor de sonido (analógico) | Nivel de ruido | ADC |
-| OLED SSD1306 | Interfaz visual | I2C |
-| Botón pulsador | Navegación de pantallas | GPIO digital |
-| Batería LiPo 1000 mAh + módulo UPS-LIPO-2 | Alimentación y carga | — |
-
-## Evolución del hardware
-
-TARS ha pasado por tres etapas de maduración, desde un prototipo de pruebas hasta una placa totalmente integrada.
-
-<table>
-<tr>
-<td><img src="docs/1-proto.jpg" alt="Prototipo en breadboard" width="400"/><br/><sub>Fase 1 — Prototipo inicial (breadboard), evaluado en Ecovilla UPB</sub></td>
-<td><img src="docs/2-pcbv1.jpg" alt="PCB TARS v1.5" width="400"/><br/><sub>Fase 2 — PCB v1.5 (actual), shield para ESP32 DevKit</sub></td>
-</tr>
-</table>
-
-![Nueva PCB integrada de siguiente generación](docs/6-pcbv2.jpg)
-<p><sub>Fase 3 — Nueva PCB integrada: ESP32 soldado, UPS embebido y USB-C nativo, sin necesidad de placas adicionales</sub></p>
-
-| Fase | Formato | Alimentación | Integración |
-|---|---|---|---|
-| 1. Prototipo | Protoboard | Externa / provisional | Ninguna, cableado expuesto |
-| 2. PCB v1.5 (actual) | Shield para ESP32 DevKit | Batería LiPo 1000 mAh + UPS externo (UPS-LIPO-2) | Headers hembra, conectores JST |
-| 3. PCB v2 (siguiente gen.) | Placa integrada compacta | UPS embebido + USB-C nativo | ESP32 soldado, todo en una superficie |
-
-## Protocolo de transmisión de datos (MOREHA)
+## Integración y protocolo FIWARE (MOREHA)
 
 TARS transmite hacia `moreha.com.co` siguiendo el flujo de seguridad de FIWARE, en dos pasos.
 
@@ -110,7 +92,7 @@ username=<DEVICE_USERNAME>
 password=<DEVICE_PASSWORD>
 ```
 
-La respuesta exitosa devuelve un `access_token` temporal.
+El dispositivo no envía datos directamente: primero solicita un `access_token` temporal al Identity Manager (Keyrock) usando sus credenciales.
 
 **Paso 2 — Transmisión segura (PEP Proxy Wilma → Orion Context Broker):**
 
@@ -127,29 +109,57 @@ Content-Type: application/json
 }
 ```
 
-Wilma valida el token con Keyrock y, si es correcto, autoriza el paso hacia Orion Context Broker. QuantumLeap y CrateDB gestionan el histórico, disponible finalmente en Dashboards de Grafana.
+Con el token obtenido, TARS envía el payload al proxy de seguridad **Wilma**, incluyendo la cabecera `Authorization: Bearer <token>`. Wilma valida el token contra Keyrock y, si es correcto, autoriza el paso hacia el **Orion Context Broker**, donde **QuantumLeap** y **CrateDB** gestionan el histórico de datos.
 
-![Arquitectura del sistema TARS - MOREHA / FIWARE](docs/7-arquitectura.png)
+<p align="center">
+  <img src="docs/arquitectura.png" alt="MOREHA Architecture - diagrama de bloques TARS y FIWARE" width="700"/>
+</p>
 
-## Instalación
+<p align="center">
+  <img src="docs/flujo-fiware.png" alt="Flujo de suscripción y persistencia de datos FIWARE" width="700"/>
+</p>
 
-1. Instala las librerías necesarias desde el Gestor de Librerías del IDE de Arduino:
-   - `Adafruit GFX Library`, `Adafruit SSD1306`
-   - `ArduinoJson`
-   - `ClosedCube_HDC1080`
-   - `DFRobot_B_LUX_V30B`
-2. Abre `firmware/TARS/TARS.ino`
-3. Selecciona la placa ESP32 en `Herramientas > Placa`
-4. Sube el código
-5. En el primer arranque, conéctate al portal cautivo local y configura la red WiFi del dispositivo
+## Plataforma web (visualización)
 
-## Estado del proyecto
+La plataforma **MOREHA** ([moreha.com.co](http://moreha.com.co)) ofrece gestión centralizada de dispositivos, ubicación geográfica, visualización 3D del entorno de pruebas e históricos de las variables medidas.
 
-El sensor de calidad de aire (PM1.0/2.5/10) está en fase experimental, en pruebas de laboratorio y validación de consumo energético antes de integrarlo al conjunto de sensores oficial. La PCB v1.5 es la placa con la que operan actualmente todos los dispositivos TARS construidos hasta la fecha; la PCB v2 integrada está en desarrollo como siguiente generación.
+<table>
+<tr>
+<td align="center"><img src="docs/dispositivos.jpg" alt="Tabla de dispositivos activos en MOREHA" width="380"/><br/><sub>Gestión de dispositivos — <code>tars1</code> reportando humedad, temperatura, iluminancia, ruido y calidad del aire</sub></td>
+<td align="center"><img src="docs/mapa.jpg" alt="Mapa geolocalizado del dispositivo tars1" width="380"/><br/><sub>Ubicación geolocalizada de <code>tars1</code> en el campus de la UPB</sub></td>
+</tr>
+<tr>
+<td align="center"><img src="docs/dashboard.jpg" alt="Panel histórico de datos en MOREHA" width="380"/><br/><sub>Histórico de humedad y temperatura en el dashboard</sub></td>
+<td align="center"><img src="docs/ecovilla.jpg" alt="Render interactivo 3D de la Ecovilla UPB" width="380"/><br/><sub>Render interactivo 3D del habitáculo de pruebas — Ecovilla UPB</sub></td>
+</tr>
+</table>
+
+## Guía de instalación y requisitos
+
+### Librerías de Arduino necesarias
+
+| Librería | Uso |
+|---|---|
+| `Adafruit GFX Library` | Renderizado gráfico base para la pantalla OLED |
+| `Adafruit SSD1306` | Controlador del display OLED |
+| `ArduinoJson` | Serialización/deserialización de payloads JSON |
+| `ClosedCube_HDC1080` | Lectura del sensor de temperatura y humedad |
+| `DFRobot_B_LUX_V30B` | Lectura del sensor de luminosidad |
+
+### Pasos de configuración
+
+1. Instala las librerías anteriores desde el Gestor de Librerías del IDE de Arduino.
+2. Abre el sketch del firmware y selecciona la placa **ESP32** en `Herramientas > Placa`.
+3. Carga el firmware al dispositivo.
+4. En el primer arranque, conéctate al **portal cautivo local** que expone el dispositivo y configura ahí la red WiFi.
+5. TARS reinicia automáticamente y comienza su ciclo normal (`EstadoINICIO` → `EstadoLECTURA` → `EstadoENVIO`).
 
 ## Créditos
 
-Desarrollado en el Semillero AgeVital, Universidad Pontificia Bolivariana. Supervisión técnica: Henry Andrade Caicedo. Desarrollo: Fer Castro.
+Desarrollado en el **Semillero AgeVital**, Universidad Pontificia Bolivariana.
+
+- **Supervisión técnica:** Henry Andrade Caicedo
+- **Desarrollo:** Fer Castro
 
 ## Licencia
 
