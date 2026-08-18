@@ -4,7 +4,7 @@ Dispositivo modular de monitoreo ambiental para interiores, basado en ESP32, con
 
 ![Plataforma](https://img.shields.io/badge/plataforma-ESP32-blue)
 ![Lenguaje](https://img.shields.io/badge/lenguaje-C++-orange)
-![PCB](https://img.shields.io/badge/hardware-PCB%20v1.5-9cf)
+![PCB](https://img.shields.io/badge/hardware-PCB%20v1-9cf)
 ![Estándar](https://img.shields.io/badge/estándar-FIWARE-orange)
 ![Licencia](https://img.shields.io/badge/licencia-MIT-green)
 
@@ -38,28 +38,21 @@ Integración en curso del sensor PM1.0 / PM2.5 / PM10 (DFRobot SEN0460), actualm
 
 ## Evolución del hardware
 
-TARS ha pasado por tres etapas de maduración, desde un prototipo de pruebas hasta una placa totalmente integrada.
+TARS partió de un prototipo de pruebas hasta llegar a la PCB con la que operan actualmente todos los dispositivos.
 
 <table>
 <tr>
 <td align="center"><img src="docs/1-proto.jpg" alt="Prototipo en breadboard" width="380"/><br/><sub><strong>Fase 1</strong> — Prototipo inicial en breadboard, cableado suelto, evaluado en Ecovilla UPB</sub></td>
-<td align="center"><img src="docs/2-pcbv1.jpg" alt="PCB TARS v1.5" width="380"/><br/><sub><strong>Fase 2</strong> — PCB actual (v1.5), ESP32 sobre headers</sub></td>
+<td align="center"><img src="docs/2-pcbv1.jpg" alt="PCB TARS actual" width="380"/><br/><sub><strong>Fase 2</strong> — PCB actual, ESP32 sobre headers</sub></td>
 </tr>
 </table>
-
-<p align="center">
-  <img src="docs/6-pcbv2.jpg" alt="Nueva PCB integrada de siguiente generación" width="420"/>
-  <br/>
-  <sub><strong>Fase 3</strong> — Nueva PCB integrada: ESP32, USB-C y UPS nativos en una sola placa</sub>
-</p>
 
 | Fase | Formato | Alimentación | Integración |
 |---|---|---|---|
 | 1. Prototipo | Protoboard | Externa / provisional | Ninguna, cableado expuesto |
-| 2. PCB v1.5 (actual) | Módulo ESP32 sobre headers | Batería LiPo 1000 mAh + UPS externa (UPS-LIPO-2) | Headers hembra, conectores JST |
-| 3. PCB v2 (siguiente gen.) | Placa integrada compacta | UPS embebida + USB-C nativo | ESP32 soldado, todo en una superficie |
+| 2. PCB actual | Módulo ESP32 sobre headers | Batería LiPo 1000 mAh + UPS externa (UPS-LIPO-2) | Headers hembra, conectores JST |
 
-La **PCB v1.5** es la placa con la que operan actualmente todos los dispositivos TARS construidos hasta la fecha: monta la ESP32 como módulo sobre headers hembra, enlaza los sensores mediante conectores JST, y se alimenta con una batería de polímero de litio de 1000 mAh gestionada por una UPS externa (UPS-LIPO-2).
+La **PCB actual** es la primera placa diseñada para el proyecto y es la que usan hoy en día todos los dispositivos TARS construidos hasta la fecha: monta la ESP32 como módulo sobre headers hembra, enlaza los sensores mediante conectores JST, y se alimenta con una batería de polímero de litio de 1000 mAh gestionada por una UPS externa (UPS-LIPO-2).
 
 ## Arquitectura de firmware
 
@@ -149,6 +142,16 @@ La plataforma **MOREHA** ([moreha.com.co](http://moreha.com.co)) ofrece gestión
 3. Carga el firmware al dispositivo.
 4. En el primer arranque, conéctate al **portal cautivo local** que expone el dispositivo y configura ahí la red WiFi.
 5. TARS reinicia automáticamente y comienza su ciclo normal (`EstadoINICIO` → `EstadoLECTURA` → `EstadoENVIO`).
+
+## Próximos cambios
+
+Se está desarrollando una nueva iteración de PCB (**v1.5**), actualmente **en fase de pruebas**, que integra de forma nativa todos los componentes en una sola placa: el microcontrolador ESP32 soldado directamente, el circuito de gestión de batería (UPS) embebido y un puerto USB-C nativo para carga y comunicación. Esto reduciría drásticamente el volumen del dispositivo respecto a la PCB actual, aunque todavía no reemplaza a la que usan los TARS en operación.
+
+<p align="center">
+  <img src="docs/6-pcbv2.jpg" alt="Nueva PCB v1.5 integrada, en fase de pruebas" width="420"/>
+  <br/>
+  <sub>PCB v1.5 — en pruebas: ESP32, USB-C y UPS nativos en una sola placa</sub>
+</p>
 
 ## Créditos
 
