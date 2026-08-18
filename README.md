@@ -8,11 +8,13 @@ Dispositivo modular de monitoreo ambiental para interiores, basado en ESP32, con
 ![Estándar](https://img.shields.io/badge/estándar-FIWARE-orange)
 ![Licencia](https://img.shields.io/badge/licencia-MIT-green)
 
-![Lote de dispositivos TARS ensamblados](docs/3-tars.jpg)
+![TARS - vista de portada](docs/0-portada.jpg)
 
 ## Descripción
 
 TARS mide temperatura, humedad, luminosidad y ruido, y muestra los datos en tiempo real en una pantalla OLED con navegación por botón. El firmware usa una arquitectura de máquina de estados modular, y los datos se transmiten de forma segura hacia `moreha.com.co` mediante autenticación OAuth2 y paso por PEP Proxy, siguiendo el flujo de FIWARE (Keyrock → Wilma → Orion Context Broker).
+
+![Lote de dispositivos TARS ensamblados](docs/3-tars.jpg)
 
 ## Características técnicas
 
@@ -42,8 +44,9 @@ TARS partió de un prototipo de pruebas hasta llegar a la PCB con la que operan 
 
 <table>
 <tr>
-<td align="center"><img src="docs/1-proto.jpg" alt="Prototipo en breadboard" width="380"/><br/><sub><strong>Fase 1</strong> — Prototipo inicial en breadboard, cableado suelto, evaluado en Ecovilla UPB</sub></td>
-<td align="center"><img src="docs/2-pcbv1.jpg" alt="PCB TARS actual" width="380"/><br/><sub><strong>Fase 2</strong> — PCB actual, ESP32 sobre headers</sub></td>
+<td align="center"><img src="docs/1-proto.jpg" alt="Prototipo en breadboard" width="300"/><br/><sub><strong>Fase 1</strong> — Prototipo inicial en breadboard, cableado suelto, evaluado en Ecovilla UPB</sub></td>
+<td align="center"><img src="docs/2a-pcbv1-vacia.jpg" alt="PCB TARS actual sin componentes" width="300"/><br/><sub><strong>Fase 2</strong> — PCB actual, sin componentes montados</sub></td>
+<td align="center"><img src="docs/2-pcbv1.jpg" alt="PCB TARS actual con componentes conectados" width="300"/><br/><sub><strong>Fase 2</strong> — PCB actual, con sensores y batería conectados</sub></td>
 </tr>
 </table>
 
@@ -53,6 +56,22 @@ TARS partió de un prototipo de pruebas hasta llegar a la PCB con la que operan 
 | 2. PCB actual | Módulo ESP32 sobre headers | Batería LiPo 1000 mAh + UPS externa (UPS-LIPO-2) | Headers hembra, conectores JST |
 
 La **PCB actual** es la primera placa diseñada para el proyecto y es la que usan hoy en día todos los dispositivos TARS construidos hasta la fecha: monta la ESP32 como módulo sobre headers hembra, enlaza los sensores mediante conectores JST, y se alimenta con una batería de polímero de litio de 1000 mAh gestionada por una UPS externa (UPS-LIPO-2).
+
+### Carcasa
+
+El dispositivo cuenta con una carcasa impresa en 3D en material **PLA**, diseñada a la medida de la PCB y los sensores.
+
+<p align="center">
+  <img src="docs/8-carcasa.jpg" alt="Carcasa de TARS impresa en 3D en PLA, sin componentes" width="380"/>
+</p>
+
+### TARS en funcionamiento
+
+Un TARS operando en un laboratorio, con el sensor de luminosidad orientado hacia la ventana y conectado a la corriente.
+
+<p align="center">
+  <img src="docs/9-en-laboratorio.jpg" alt="TARS en funcionamiento en un laboratorio, conectado a la corriente" width="450"/>
+</p>
 
 ## Arquitectura de firmware
 
