@@ -121,16 +121,12 @@ Con el token obtenido, TARS envía el payload al proxy de seguridad **Wilma**, i
 
 ## Plataforma web (visualización)
 
-La plataforma **MOREHA** ([moreha.com.co](http://moreha.com.co)) ofrece gestión centralizada de dispositivos, ubicación geográfica, visualización 3D del entorno de pruebas e históricos de las variables medidas.
+La plataforma **MOREHA** ([moreha.com.co](http://moreha.com.co)) ofrece gestión centralizada de dispositivos e históricos de las variables medidas.
 
 <table>
 <tr>
 <td align="center"><img src="docs/dispositivos.jpg" alt="Tabla de dispositivos activos en MOREHA" width="380"/><br/><sub>Gestión de dispositivos — <code>tars1</code> reportando humedad, temperatura, iluminancia, ruido y calidad del aire</sub></td>
-<td align="center"><img src="docs/mapa.jpg" alt="Mapa geolocalizado del dispositivo tars1" width="380"/><br/><sub>Ubicación geolocalizada de <code>tars1</code> en el campus de la UPB</sub></td>
-</tr>
-<tr>
 <td align="center"><img src="docs/dashboard.jpg" alt="Panel histórico de datos en MOREHA" width="380"/><br/><sub>Histórico de humedad y temperatura en el dashboard</sub></td>
-<td align="center"><img src="docs/ecovilla.jpg" alt="Render interactivo 3D de la Ecovilla UPB" width="380"/><br/><sub>Render interactivo 3D del habitáculo de pruebas — Ecovilla UPB</sub></td>
 </tr>
 </table>
 
