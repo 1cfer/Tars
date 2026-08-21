@@ -1,0 +1,10 @@
+# Archivo de secretos locales
+*secrets.h
+*Credentials.h
+
+# Archivos temporales de compilación
+build/
+.vscode/
+*.bin
+*.elf
+*.map
