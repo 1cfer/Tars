@@ -137,17 +137,17 @@ void EstadoENVIO::onEnter() {
 }
 
 void EstadoENVIO::execute() { 
-    unsigned long now = statemachine->clocks.tiempo_actual;
+    unsigned long now = millis();
     ButtonHandler::Event btn = statemachine->currentEvent;
 
-    // Permitir ir al modo desarrollador si se traba el envío
+    // Permitir ir al modo desarrollador si se requiere interrumpir
     if (btn == ButtonHandler::VERY_LONG_PRESS_4S) {
         statemachine->ChangeState(new EstadoDESARROLLADOR());
         return;
     }
 
     if (!wifiManager.isConnected()) { 
-        Serial.println("Sin conexión WiFi, posponiendo envío"); 
+        Serial.println("[ENVIO] Sin conexion WiFi, posponiendo reintento"); 
         statemachine->clocks.proximo_envio = now + appConfig.intervaloReintento; 
         statemachine->flags.envio_programado = true; 
         statemachine->ChangeState(new EstadoLECTURA()); 
@@ -155,7 +155,7 @@ void EstadoENVIO::execute() {
     }
 
     if (!appConfig.skipToken && !tokenManager.ensureValidToken()) { 
-        Serial.println("[ENVIO] No se pudo obtener token, posponiendo envío"); 
+        Serial.println("[ENVIO] No se pudo obtener token valido, programando reintento rapido"); 
         statemachine->clocks.proximo_envio = now + appConfig.intervaloReintento; 
         statemachine->flags.envio_programado = true; 
         statemachine->ChangeState(new EstadoLECTURA()); 
@@ -163,24 +163,27 @@ void EstadoENVIO::execute() {
     }
 
     SensorData avg = sensorManager.getAverages(); 
-    sensorManager.resetAccumulator();
 
-    // EXCLUIDO EL SENSOR PM: Construimos el payload solo con Temperatura, Humedad, Luz y Ruido
+    // Construir el payload JSON con los sensores activos
     String payload = construirPayload(avg.temp, avg.hum, avg.lux, avg.dbValue); 
     Serial.println("[ENVIO] Payload JSON:"); 
     Serial.println(payload);
 
-    WiFiClientSecure *client = new WiFiClientSecure(); 
-    if (!client) { 
+    WiFiClientSecure client; 
+    client.setInsecure();
+
+    HTTPClient http; 
+    http.setTimeout(10000); 
+    
+    if (!http.begin(client, appConfig.serverUrl)) {
+        Serial.println("[ENVIO] Error al inicializar conexion HTTP con el servidor");
+        client.stop();
         statemachine->clocks.proximo_envio = now + appConfig.intervaloReintento; 
         statemachine->flags.envio_programado = true; 
         statemachine->ChangeState(new EstadoLECTURA()); 
-        return; 
-    } 
-    client->setInsecure();
+        return;
+    }
 
-    HTTPClient http; 
-    http.begin(*client, appConfig.serverUrl); 
     http.addHeader("Content-Type", "application/json"); 
     if (!appConfig.skipToken) { 
         http.addHeader("Authorization", "Bearer " + tokenManager.getToken()); 
@@ -189,14 +192,20 @@ void EstadoENVIO::execute() {
     int httpResponseCode = http.PATCH(payload);
 
     if (httpResponseCode >= 200 && httpResponseCode < 300) { 
-        Serial.printf("✓ Envío exitoso, código: %d\n", httpResponseCode); 
-    } else if (httpResponseCode == 401) { 
+        Serial.printf("[ENVIO] ✓ Exitoso, codigo: %d\n", httpResponseCode); 
+        sensorManager.resetAccumulator();
+        statemachine->clocks.proximo_envio = now + appConfig.intervaloEnvio; 
+    } else if (httpResponseCode == 401 || httpResponseCode == 403 || httpResponseCode == 302) { 
+        Serial.printf("[ENVIO] Wilma rechazo acceso (HTTP %d). Invalidando token...\n", httpResponseCode);
         tokenManager.clear(); 
+        statemachine->clocks.proximo_envio = now + appConfig.intervaloReintento; 
+    } else {
+        Serial.printf("[ENVIO] Error HTTP: %d. Programando reintento...\n", httpResponseCode);
+        statemachine->clocks.proximo_envio = now + appConfig.intervaloReintento; 
     }
 
     http.end(); 
-    delete client; 
-    statemachine->clocks.proximo_envio = now + appConfig.intervaloEnvio; 
+    client.stop(); 
     statemachine->flags.envio_programado = true; 
     statemachine->ChangeState(new EstadoLECTURA()); 
 }
@@ -250,13 +259,13 @@ void EstadoDESARROLLADOR::execute() {
             return;
         } 
         else if (btn == ButtonHandler::SHORT_PRESS) {
-            subMode = 1;
+            subMode = 1; 
             WiFi.scanNetworks(true); 
             display.clearDisplay(); 
             display.setCursor(10,30); 
             display.print("Buscando WiFi..."); 
             display.display();
-        }
+        } 
     } 
     // ===== SUB-MODO 1: ESCANEANDO =====
     else if (subMode == 1) { 
@@ -267,66 +276,67 @@ void EstadoDESARROLLADOR::execute() {
             scrollOffset = 0; 
             subMode = 2; 
             displayWiFiList(selectedNetwork, scrollOffset, totalNetworks);
-        }
-    }
+        } 
+    } 
     // ===== SUB-MODO 2: LISTA PAGINADA =====
     else if (subMode == 2) { 
-        // 4 Segundos ignorados a propósito
         if (btn == ButtonHandler::DOUBLE_CLICK) { 
             WiFi.scanDelete(); 
             subMode = 0; 
-            displayDeveloperInfo();
+            displayDeveloperInfo(); 
         } 
         else if (btn == ButtonHandler::SHORT_PRESS) { 
             selectedNetwork++;
-            if (selectedNetwork >= totalNetworks) selectedNetwork = 0;
-            if (selectedNetwork >= scrollOffset + 5) scrollOffset = selectedNetwork - 4;
-            if (selectedNetwork < scrollOffset) scrollOffset = selectedNetwork;
-            displayWiFiList(selectedNetwork, scrollOffset, totalNetworks);
+            if (selectedNetwork >= totalNetworks) selectedNetwork = 0; 
+            if (selectedNetwork >= scrollOffset + 5) scrollOffset = selectedNetwork - 4; 
+            if (selectedNetwork < scrollOffset) scrollOffset = selectedNetwork; 
+            displayWiFiList(selectedNetwork, scrollOffset, totalNetworks); 
         } 
         else if (btn == ButtonHandler::LONG_PRESS_2S) { 
             String ssid = WiFi.SSID(selectedNetwork);
-            // REVISAR EL LLAVERO CON EL NUEVO METODO
             if (wifiManager.hasCredentialsFor(ssid)) { 
                 display.clearDisplay(); 
                 display.setCursor(10,30); 
                 display.print("Conectando..."); 
                 display.display();
-                wifiManager.connectTo(ssid); // Conectar a esa red específica
+                wifiManager.connectTo(ssid); 
                 subMode = 0; 
-                displayDeveloperInfo();
+                displayDeveloperInfo(); 
             } else {
-                subMode = 3;
-                wifiManager.createAP(appConfig.hostname);
-                MDNS.begin(appConfig.hostname.c_str());
-                if (!devWeb) { devWeb = new DevWebOTA(&server); }
+                subMode = 3; 
+                wifiManager.createAP(appConfig.hostname); 
+                MDNS.begin(appConfig.hostname.c_str()); 
+                if (!devWeb) { devWeb = new DevWebOTA(&server); } 
                 server.begin(); 
-                displayAPAlert();
-            }
-        }
-    }
+                displayAPAlert(); 
+            } 
+        } 
+    } 
     // ===== SUB-MODO 3: ALERTA AP Y SERVIDOR LOCAL =====
     else if (subMode == 3) { 
         devWeb->handle();
-        // 4 Segundos ignorados a propósito
         if (btn == ButtonHandler::DOUBLE_CLICK) { 
+            WiFi.enableAP(false);
+            WiFi.mode(WIFI_STA);
+
             subMode = 0; 
             displayDeveloperInfo(); 
             
-            // Si el usuario configuró desde la web local, intentar conexión inmediatamente al salir
             if(WiFi.status() != WL_CONNECTED) {
                 display.clearDisplay(); display.setCursor(10,30); 
                 display.print("Aplicando Red..."); display.display();
-                wifiManager.connect(5);
+                wifiManager.connect(5); 
                 displayDeveloperInfo(); 
-            }
-        }
-    }
+            } 
+        } 
+    } 
 }
 
 void EstadoDESARROLLADOR::onExit() { 
     statemachine->flags.dev = false; 
     primera_vez = true; 
+    WiFi.enableAP(false);
+    WiFi.mode(WIFI_STA);
     if (devWeb) { devWeb->end(); } 
 }
 

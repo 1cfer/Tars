@@ -27,7 +27,7 @@
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1); 
 ClosedCube_HDC1080 hdc1080; 
-DFRobot_B_LUX_V30B luxSensor(&Wire, 5); // Tu librería preferida
+DFRobot_B_LUX_V30B luxSensor(&Wire, 5);
 WebServer server(80); 
 AppConfig appConfig; 
 WiFiManager wifiManager; 
@@ -38,20 +38,57 @@ SensorManager sensorManager;
 
 SET_LOOP_TASK_STACK_SIZE(16384); 
 
+// Función para mostrar la portada institucional y limpiar píxeles parásitos de arranque
+void displaySplash() {
+  display.clearDisplay();
+  display.setTextColor(SSD1306_WHITE);
+  
+  // Encabezado institucional
+  display.setTextSize(2);
+  display.setCursor(18, 8);
+  display.println("AgeVital");
+  
+  // Nombre configurado del dispositivo (ej: tars1, moreha1, etc.)
+  display.setTextSize(1);
+  display.setCursor(15, 30);
+  if (appConfig.hostname.length() > 0) {
+    display.print("Nodo: ");
+    display.println(appConfig.hostname);
+  } else {
+    display.println("PROYECTO TARS");
+  }
+  
+  display.setCursor(15, 48);
+  display.println("Iniciando nodo...");
+  
+  display.display();
+  delay(1500); // Pausa para visualizar la portada en el arranque
+}
+
 void setup() { 
   Serial.begin(115200); 
+
   Wire.begin(21, 22);
   Wire.setTimeOut(1000); 
-  
-  hdc1080.begin(0x40); 
   Wire.setClock(50000); 
+
+  // 1. Cargar configuración desde memoria EEPROM/NVS
+  appConfig.begin();
+
+  // 2. Inicializar pantalla OLED y mostrar portada de inmediato
+  if (display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+    displaySplash();
+  } else {
+    Serial.println("[DISPLAY] Error al iniciar SSD1306");
+  }
+
+  // 3. Inicializar sensores periféricos
+  hdc1080.begin(0x40); 
   luxSensor.begin(); 
   analogReadResolution(12);
 
-  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) while (1); 
-
+  // 4. Inicializar subsistemas y máquina de estados
   buttonHandler.begin();
-  appConfig.begin();
   sensorManager.begin();
   stateMachine.begin(new EstadoINICIO()); 
 }
@@ -60,26 +97,26 @@ void loop() {
   ButtonHandler::Event event = buttonHandler.update();
 
   if (event != ButtonHandler::NONE) { 
-    // Actualizamos el reloj de interacción siempre que se presione algo
+    // Actualizamos el reloj de interacción siempre que se presione el botón
     stateMachine.clocks.ultima_interaccion = millis();
     
     // Si la pantalla estaba apagada, la despertamos
     if (!stateMachine.isDisplayOn) {
-        stateMachine.isDisplayOn = true;
-        stateMachine.needsUpdate = true;
-        
-        // REQUERIMIENTO: Si el evento fue un clic corto para despertar la pantalla, 
-        // lo anulamos aquí mismo para que NO avance a la siguiente vista de sensores.
-        if (event == ButtonHandler::SHORT_PRESS) {
-            event = ButtonHandler::NONE; 
-        }
+      stateMachine.isDisplayOn = true;
+      stateMachine.needsUpdate = true;
+      
+      // Si el evento fue un clic corto para despertar la pantalla, 
+      // lo anulamos para que NO avance a la siguiente vista de sensores
+      if (event == ButtonHandler::SHORT_PRESS) {
+        event = ButtonHandler::NONE; 
+      }
     }
   }
 
-  // Puente: Pasamos el evento a los estados para que ellos decidan qué hacer.
-  // Si anulamos el clic corto arriba, a la máquina de estados llegará como "NONE"
-  // y la pantalla se quedará exactamente donde la dejaste.
+  // Pasamos el evento a los estados
   stateMachine.currentEvent = event;
   stateMachine.update(); 
   stateMachine.currentEvent = ButtonHandler::NONE; // Limpiamos el evento
+
+  yield(); // Alimentar el Watchdog de FreeRTOS
 }
