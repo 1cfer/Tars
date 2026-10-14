@@ -1,4 +1,6 @@
-# Operación y mantenimiento TARS 4.0.4
+> Primera vinculación simple: consultar [VINCULACION.md](VINCULACION.md). Después de vincular cambia la contraseña inicial por la individual del servidor.
+
+# Operación y mantenimiento TARS 4.1.0
 
 ## Actualizar por OTA local
 
@@ -28,7 +30,7 @@ OTA remota requiere perfil TARS, chip ESP32 clásico y comprobación de bootload
 
 ## Diagnóstico
 
-Monitor serie 115200. WIFI abre mantenimiento normal y permite consultar clave local; para recuperación forzada usar botón 10 s. El primer arranque inicia el panel cerrado; no hace falta puerto serie para configurar usando el botón.
+Monitor serie 115200. WIFI abre mantenimiento normal y permite consultar clave local; para recuperación forzada usar botón 10 s. Un equipo nuevo sin ID ni WiFi abre el AP inicial; uno configurado inicia el panel cerrado; no hace falta puerto serie para configurar usando el botón.
 
 I2C esperado: OLED 0x3C/0x3D, HDC1080 0x40, luz 0x4A. Un ACK identifica presencia, no el controlador. Error I2C=2 es NACK de dirección; revisar alimentación, pinout y continuidad antes de declarar daño. Si temperatura/humedad invalidas, comprobar el HDC1080: fallos=0x3 representa esas dos lecturas. No inventar valores.
 

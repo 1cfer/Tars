@@ -24,13 +24,14 @@ void setup(){
  if(!Tars::mutex){AmeriOta::rollbackIfPending();return;}
  WiFi.mode(WIFI_STA);WiFi.persistent(false);WiFi.setSleep(true);
  if(!Tars::loadConfig()){Serial.println("[TARS] Configuracion invalida; no se borra ni sustituye.");AmeriOta::rollbackIfPending();return;}
- Tars::beginNetwork();Tars::beginSensors();Tars::beginMaintenance();
+ Tars::beginPairing();Tars::beginNetwork();Tars::beginSensors();Tars::beginMaintenance();
  configTime(0,0,Tars::config.ntpServer.c_str(),Tars::config.ntpFallback.c_str());
  TaskHandle_t sensors=nullptr,network=nullptr;
  if(xTaskCreatePinnedToCore(Tars::sensorTask,"tars-sensors",8192,nullptr,2,&sensors,1)!=pdPASS||xTaskCreatePinnedToCore(Tars::networkTask,"tars-network",16384,nullptr,1,&network,0)!=pdPASS){Serial.println("[TARS] No se pudieron crear tareas.");AmeriOta::rollbackIfPending();return;}
  bootAt=Tars::nowUs();started=true;
- // El mantenimiento solo se abre por boton, serie o comando autenticado, nunca al arrancar.
- Serial.println("[TARS] 4.0.4: Escriba WIFI + Enter en serie para abrir mantenimiento y consultar su clave local.");
+ // Primera configuracion vacia: AP inicial; equipos configurados conservan mantenimiento temporal.
+ if(Tars::snapshot().id=="new"&&!Tars::snapshot().ssid.length())Tars::requestRecovery(600);
+ Serial.println("[TARS] 4.1.0: Escriba WIFI + Enter en serie para abrir mantenimiento y consultar su clave local.");
  Serial.println("[TARS] Arranque; diagnostico sin credenciales. Boton 4s: mantenimiento. Boton 10s: AP de recuperacion 10min.");
 }
 void loop(){if(!started){delay(100);return;}
@@ -38,7 +39,7 @@ void loop(){if(!started){delay(100);return;}
  if(Ameri::identity.bound&&!otaStarted&&Tars::nowUs()>=nextOtaAttempt){nextOtaAttempt=Tars::nowUs()+60000000;otaStarted=AmeriOta::begin();}
  Tars::Reading r;{Tars::Lock lock;r=Tars::reading;}
  bool sensorOK=r.uptimeUs&&Tars::nowUs()-r.uptimeUs<uint64_t(c.readMs)*2000&&(r.failures&7)!=7;
- if(otaStarted){AmeriOta::Safety s(Tars::maintenanceActive()||Tars::localUpload||Tars::configProbation(),true,Tars::storageReady&&sensorOK,Tars::pendingCount());s.otaEnabled=c.otaEnabled;AmeriOta::Network n;n.base=c.controlUrl;n.ca=c.ca;AmeriOta::tick(s,n,Tars::persistBoundary);}
+ if(otaStarted){AmeriOta::Safety s(Tars::maintenanceActive()||Tars::localUpload||Tars::configProbation(),true,Tars::storageReady&&sensorOK,Tars::pendingCount());s.otaEnabled=c.otaEnabled;AmeriOta::Network n;n.base=Tars::otaBase(c);n.ca=c.ca;AmeriOta::tick(s,n,Tars::persistBoundary);}
  else { // Primera migracion por OTA clasica, aun sin clave de control provisionada.
   esp_ota_img_states_t state;if(esp_ota_get_state_partition(esp_ota_get_running_partition(),&state)==ESP_OK&&state==ESP_OTA_IMG_PENDING_VERIFY){
    if(Tars::storageReady&&sensorOK&&Tars::nowUs()-bootAt>10000000)esp_ota_mark_app_valid_cancel_rollback();

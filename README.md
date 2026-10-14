@@ -3,7 +3,7 @@
 # TARS
 ### Monitoreo ambiental con ESP32 · FIWARE · mantenimiento sin cables
 
-![Firmware](https://img.shields.io/badge/firmware-4.0.4-0f766e)
+![Firmware](https://img.shields.io/badge/firmware-4.1.0-0f766e)
 ![ESP32](https://img.shields.io/badge/ESP32-WROOM--DA-2563eb)
 ![Arduino](https://img.shields.io/badge/Arduino_ESP32-3.3.12-00979d)
 ![Contrato](https://img.shields.io/badge/telemetría-NGSIv2-7c3aed)
@@ -20,7 +20,7 @@
 
 TARS mide temperatura, humedad relativa, iluminancia y señal de sonido. Muestra valores en una OLED SSD1306 y envía ventanas de muestras válidas como atributos NGSIv2. Está orientado a prototipos de monitoreo ambiental y comparación de condiciones en espacios interiores.
 
-La versión 4.0.4 usa tareas independientes de lectura y red, hasta cuatro destinos HTTPS, colas persistentes y mantenimiento temporal por botón. Una petición HTTPS no ejecuta la lectura de sensores. El firmware conserva la medición durante mantenimiento.
+La versión 4.1.0 usa tareas independientes de lectura y red, hasta cuatro destinos HTTPS, colas persistentes y mantenimiento temporal por botón. Una petición HTTPS no ejecuta la lectura de sensores. El firmware conserva la medición durante mantenimiento.
 
 **Estado:** compilación para ESP32 3.3.12 y pruebas de lógica verificadas; esta versión necesita validación física en un TARS antes de un despliegue en lote. La comunicación I²C y la lectura del HDC1080 deben comprobarse en cada equipo. El firmware no convierte este prototipo en un instrumento meteorológico o acústico certificado.
 
@@ -34,11 +34,13 @@ La versión 4.0.4 usa tareas independientes de lectura y red, hasta cuatro desti
 | Clic corto con pantalla encendida | Cambia de página |
 | Mantener 4 segundos | Mantenimiento 10 minutos: IP actual si conectado; AP si desconectado |
 | Seguir manteniendo hasta 10 segundos | AP de recuperación forzado durante 10 minutos, incluso con WiFi conectado |
-| Reiniciar | Panel y AP cerrados; continúa la configuración guardada |
+| Reiniciar | Equipo configurado: panel/AP cerrados. Equipo nuevo sin ID ni WiFi: AP inicial 10 min |
 
 La pulsación de 10 segundos primero pasa por la acción de 4 segundos. La cuenta de recuperación comienza al llegar a los 10 segundos. Mantener el botón no renueva continuamente el plazo. Al soltarlo no se genera un clic adicional.
 
-**AP:** `TARS-{identificador}` o `TARS-NEW-{sufijo MAC}`. **Dirección:** `http://192.168.4.1`. **Clave inicial del AP:** `tars12345678`. **Panel:** usuario `admin`, misma contraseña del AP. Se puede cambiar desde el panel; una clave vacía conserva la existente. La primera migración a 4.0.2 o posterior sustituye una vez la antigua clave aleatoria por esta clave inicial común.
+**AP:** `TARS-{identificador}` o `TARS-NEW-{sufijo MAC}`. **Dirección:** `http://192.168.4.1`. **Clave inicial del AP:** `tars12345678`. **Panel:** usuario `admin`, misma contraseña del AP. Se puede cambiar desde el panel; una clave vacía conserva la existente. Las versiones 4.0.2–4.0.4 aplicaban una migración única de esa clave; 4.1.0 conserva las claves ya guardadas.
+
+Tras vincular con AMERI, el servidor entrega una **clave individual** de mantenimiento. La clave común es solamente inicial. La actualización 4.1.0 conserva las claves existentes; no las vuelve a poner en el valor de fábrica.
 
 El AP forzado usa AP+STA: conserva la conexión principal y no cambia sus credenciales. Cuando termina el plazo, cierra AP y panel. El modo normal retira el AP si vuelve la conexión principal; el modo forzado lo mantiene hasta que expire o se cierre. Una carga OTA en curso pospone los cambios de interfaz; el plazo de mantenimiento sigue vigente.
 
@@ -47,7 +49,7 @@ El AP forzado usa AP+STA: conserva la conexión principal y no cambia sus creden
 1. Instala Arduino IDE y **esp32 by Espressif Systems 3.3.12**.
 2. Instala **ArduinoJson 7**, **Adafruit SSD1306**, **Adafruit GFX Library** y **Adafruit BusIO**. Versiones utilizadas: 7.4.3, 2.5.15, 1.12.4 y 1.17.4 respectivamente.
 3. Abre [`firmware/TARS/TARS.ino`](firmware/TARS/TARS.ino). Mantén todos los archivos de esa carpeta, incluido `build_opt.h`.
-4. Selecciona **ESP32-WROOM-DA Module**, flash **4 MB**, esquema **Default 4 MB con dos particiones OTA** y velocidad de carga **115200**. En un equipo instalado conserva su esquema existente. No elijas un esquema sin OTA ni borres toda la flash.
+4. Selecciona **ESP32-WROOM-DA Module**, flash **4 MB**, esquema **Default 4 MB con dos particiones OTA** y velocidad de carga **115200**. En un equipo instalado conserva su esquema existente. No elijas un esquema sin OTA ni borres toda la flash. El panel gzip viene generado: si editas `TarsPage.h`, ejecuta `python tools/pack_panel.py` antes de compilar. No hacen falta librerías extra.
 5. Selecciona el puerto y sube por USB para la instalación inicial. Monitor serie: **115200**.
 6. Configura el equipo desde el panel. No hace falta recompilar por cada TARS ni editar credenciales en el código.
 
@@ -66,7 +68,19 @@ Este firmware es para ESP32 clásico; no cargarlo en ESP32-S3. Conservar el esqu
 
 [Contrato de control V2](docs/guides/CONTRATO_CONTROL_V2.md) · [Contrato OTA AMERI1](docs/guides/CONTRATO_OTA_AMERI1.md) · [Prompt para integrar el servidor](docs/guides/PROMPT_SERVIDOR_TARS.md).
 
-Control y OTA desde servidor requieren URL base y clave HMAC **individual** de 64 caracteres hexadecimales en minúscula, suministrada por el servidor. Es distinta del token de telemetría y de la contraseña del AP. No inventar claves ni incluir credenciales reales en GitHub. La WiFi por sí sola no habilita control remoto.
+### Vincular con AMERI sin archivos ni claves HMAC manuales
+
+Primero guarda WiFi y espera **UTC listo**. En AMERI Devices crea el mismo ID definitivo y genera un código temporal autorizado de 32 hex minúsculas. En el panel local, sección **Vincular con AMERI**, introduce ID, base de control (actualmente `https://infver.tail8e92a9.ts.net:10000`, sin barra final) y código. La URL Orion es otro campo y se conserva.
+
+El equipo guarda la petición y su nonce antes de enviarla, valida HTTPS, ID/MAC/perfil/firma y confirma credenciales mediante un único guardado de configuración. Después inicia control V2 y OTA AMERI1. Un HTTP 200 de pairing no confirma contacto firmado: espera el reporte HMAC y comprueba Último contacto en Devices.
+
+**Añadir histórico AMERI** es opcional. Solo usa un slot completamente libre sin pendientes; conserva todos los otros destinos. Si no hay espacio, informa que la vinculación quedó guardada y que el histórico necesita elegir destino desde Devices. Si el receptor histórico proyecta a Orion, desactiva explícitamente el envío directo a esa misma entidad para evitar duplicados.
+
+Antes de cerrar el panel, usa **Consultar nueva clave de mantenimiento** y guárdala privadamente. La sesión actual conserva su clave de acceso hasta cerrarse; las siguientes usan la clave individual. La consulta devuelve únicamente la clave del AP, nunca control_key, Bearer ni el payload bruto. Diagnósticos/reportes no contienen contraseñas.
+
+[Contrato y pruebas de vinculación](docs/guides/VINCULACION.md). El servidor de vinculación debe estar instalado y validado en la Raspberry; este repositorio no prueba su despliegue físico.
+
+También se conserva la provisión manual: control y OTA desde servidor requieren URL base y clave HMAC **individual** de 64 caracteres hexadecimales en minúscula, suministrada por el servidor. Es distinta del token de telemetría y de la contraseña del AP. No inventar claves ni incluir credenciales reales en GitHub. La WiFi por sí sola no habilita control remoto.
 
 ## Sensores y conexiones
 
@@ -133,7 +147,7 @@ CPU 80 MHz por defecto, ahorro WiFi, brillo OLED 32/255 y apagado a los 60 s de 
 
 ## Fotografías y hardware
 
-Fotografías reales ya incluidas en el proyecto; muestran revisiones anteriores y no son capturas de validación del firmware 4.0.4.
+Fotografías reales ya incluidas en el proyecto; muestran revisiones anteriores y no son capturas de validación del firmware 4.1.0.
 
 <table><tr><td><img src="docs/3-tars.jpg" alt="Lote de TARS" width="330"/></td><td><img src="docs/2-pcbv1.jpg" alt="PCB y conexiones de una revisión anterior" width="330"/></td></tr><tr><td><img src="docs/8-carcasa.jpg" alt="Carcasa TARS" width="330"/></td><td><img src="docs/6-pcbv2.jpg" alt="PCB experimental" width="330"/></td></tr></table>
 
@@ -148,7 +162,7 @@ Carcasas imprimibles en [`hardware/`](hardware/). Diagramas SVG editables en [`d
 - Después de 10 min, panel y AP cerrados; lecturas y envío continúan.
 - Validar HDC1080, estabilidad OLED, HTTPS, conservación tras reinicio y OTA real en un equipo.
 
-Pruebas de lógica con Node.js: `node tests/recovery.cjs` y `node tests/display.cjs`. Usan funciones extraídas del fuente con hardware simulado; no sustituyen pruebas físicas. [Resultados de compilación](docs/validation.json).
+Pruebas de lógica con Node.js: `node tests/recovery.cjs`, `node tests/display.cjs` y `node tests/pairing.cjs`. Usan funciones extraídas del fuente con hardware simulado; no sustituyen pruebas físicas. [Resultados de compilación](docs/validation.json).
 
 ## Contribuir
 

@@ -92,7 +92,7 @@ void beginSensors(){
  oledOK=(screen3c||screen3d)&&oled.begin(SSD1306_SWITCHCAPVCC,screenAddress,true,false);
  Serial.printf("[OLED] SSD1306 128x64 direccion=0x%02X resultado=%s\n",screenAddress,oledOK?"INICIALIZADO":"NO DETECTADO / SIN MEMORIA");
  if(oledOK){oled.clearDisplay();oled.setTextColor(SSD1306_WHITE);oled.setTextSize(2);oled.setCursor(0,0);oled.print("TARS");
-  oled.setTextSize(1);oled.setCursor(0,25);oled.print("Arranque 4.0.4");oled.setCursor(0,40);oled.print("Inicializando...");flushOled();}
+  oled.setTextSize(1);oled.setCursor(0,25);oled.print("Arranque 4.1.0");oled.setCursor(0,40);oled.print("Inicializando...");flushOled();}
  checkHdc();Serial.printf("[HDC1080] %s\n",hdcOK?"OK":"No identificado");
  Wire.beginTransmission(0x40);Wire.write(2);Wire.write(0);Wire.write(0);Wire.endTransmission();
  boot=randomHex(16);intervalStart=nowUs();interaction=intervalStart;

@@ -34,5 +34,7 @@ String diagnostics();String manifest();void beginSensors();void sensorTask(void*
 void beginNetwork();void networkTask(void*);bool enqueue(const String&);uint32_t pendingCount();bool persistBoundary();
 void beginMaintenance();void maintenanceLoop();bool maintenanceActive();uint32_t maintenanceRemaining();
 void controlTick(const Config&);void networkSuccess(bool control,unsigned slot,uint32_t version);void configTick();bool configProbation();
+bool commitPairing(const String&,bool,String&);
+void beginPairing();bool startPairing(const String&,String&);void pairingTick(const Config&);String pairingStatus();void pairingControlSeen(const Config&);String otaBase(const Config&);bool storeOtaBinding(const Config&,const String&,String&);
 void requestMaintenance(uint32_t);void requestRecovery(uint32_t);void oledPage();String buildPayload(const Config&,const Reading&,uint32_t,const String&,uint64_t,uint32_t,const uint32_t*);
 }

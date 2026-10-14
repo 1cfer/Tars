@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="550" viewBox="0 0 1200 550" role="img"><title>TARS · botón y recuperación</title><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#64748b"/></marker></defs><rect width="1200" height="550" rx="24" fill="#f8fafc"/>
 <text x="45" y="52" font-family="Arial,Helvetica,sans-serif" font-size="30" fill="#0f172a">TARS · botón y recuperación</text>
-<text x="45" y="84" font-family="Arial,Helvetica,sans-serif" font-size="16" fill="#475569">Sin pantalla, sin servidor y sin puerto serie · el AP no se abre automáticamente al arrancar</text>
+<text x="45" y="84" font-family="Arial,Helvetica,sans-serif" font-size="16" fill="#475569">Sin pantalla, sin servidor y sin puerto serie · AP inicial en equipo nuevo · recuperación independiente de la pantalla</text>
 <rect x="40" y="140" width="330" height="165" rx="14" fill="#fff" stroke="#cbd5e1" stroke-width="2"/>
 <text x="58" y="172" font-family="Arial,Helvetica,sans-serif" font-size="20" fill="#0f172a">Clic corto</text>
 <text x="58" y="200" font-family="Arial,Helvetica,sans-serif" font-size="16" fill="#475569">Pantalla apagada → despertar</text>

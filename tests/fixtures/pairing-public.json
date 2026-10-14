@@ -1,0 +1,18 @@
+[
+  {
+    "code_ascii": "0123456789abcdef0123456789abcdef",
+    "device_id": "tars_test_01",
+    "nonce": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "payload_json": "{\"device_id\":\"tars_test_01\",\"preserve_local_configuration\":true}",
+    "canonical_utf8": "ameri-pairing-1\ntars_test_01\naaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\nf23734ad394c979170b05276c1d16f2a6f80969ae24e7860d7c56c1e7b1c7cd6",
+    "signature": "6c386f57b2d307dff92955414c354fcd6098da58953cb3629f5e1fd7d72f1588"
+  },
+  {
+    "code_ascii": "0123456789abcdef0123456789abcdef",
+    "device_id": "tars_test_01",
+    "nonce": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "payload_json": "{ \"device_id\": \"tars_test_01\", \"preserve_local_configuration\": true }",
+    "canonical_utf8": "ameri-pairing-1\ntars_test_01\naaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n9d0d605f440c4f85bd65f545bbcd194522e0a5ebb61361616aa27aa6682c7540",
+    "signature": "b4060db698ebe64d03c29e849be1701a4871b4d798cfc6355cde35537d71067c"
+  }
+]

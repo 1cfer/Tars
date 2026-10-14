@@ -26,7 +26,7 @@ void controlTick(const Config&c){
  status["device_signature"]=hmac(c.controlKey,String("v2-status\n")+c.id+"\n"+String((unsigned long long)last)+"\n"+(active?"1":"0")+"\n"+String(remain)+"\n"+nonce+"\n"+sha(s));String body;serializeJson(status,body);
  String base=c.controlUrl+"/api/devices/"+c.id+"/commands";
  if(request(c,base+"/next","POST",body,nullptr,response,"application/json","")!=200)return;networkSuccess(true,0,c.version);
- JsonDocument d;if(!ameriParseObject(d,response))return;JsonObjectConst cmd=d["command"].as<JsonObjectConst>();if(cmd.isNull())return;
+ JsonDocument d;if(!ameriParseObject(d,response))return;if(d.containsKey("command"))pairingControlSeen(c);JsonObjectConst cmd=d["command"].as<JsonObjectConst>();if(cmd.isNull())return;
  if(!cmd["protocol_version"].is<unsigned>()||cmd["protocol_version"].as<unsigned>()!=2||!cmd["sequence"].is<uint64_t>()||!cmd["expires_at"].is<int64_t>()||!cmd["duration_seconds"].is<uint32_t>()||!cmd["config_json"].is<String>())return;
  String device=cmd["device_id"].as<String>(),id=cmd["command_id"].as<String>(),action=cmd["action"].as<String>(),patch=cmd["config_json"].as<String>();uint64_t seq=cmd["sequence"].as<uint64_t>();int64_t expiry=cmd["expires_at"].as<int64_t>();uint32_t seconds=cmd["duration_seconds"].as<uint32_t>();
  if(device!=c.id||!id.length()||id.length()>64||patch.length()>8192||seq<=last||seq>9007199254740991ULL||!clockReady()||expiry<=time(nullptr)||expiry>time(nullptr)+120)return;

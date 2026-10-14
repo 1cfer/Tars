@@ -1,6 +1,6 @@
 #include "Tars.h"
 #include "AmeriOta.h"
-#include "TarsPage.h"
+#include "TarsPageGzip.h"
 #include "Sha256Page.h"
 #include <WebServer.h>
 #include <WiFi.h>
@@ -10,7 +10,7 @@
 #include <mbedtls/sha256.h>
 namespace Tars {
 namespace {
-WebServer web(80);uint64_t until=0;portMUX_TYPE deadlineMux=portMUX_INITIALIZER_UNLOCKED;bool maintenanceAp=false,forcedAp=false;String csrf,error,expectedHash;uint64_t rebootAt=0;
+WebServer web(80);uint64_t until=0;portMUX_TYPE deadlineMux=portMUX_INITIALIZER_UNLOCKED;bool maintenanceAp=false,forcedAp=false;String sessionPassword,csrf,error,expectedHash;uint64_t rebootAt=0;
 uint64_t deadline(){portENTER_CRITICAL(&deadlineMux);uint64_t t=until;portEXIT_CRITICAL(&deadlineMux);return t;}
 void deadline(uint64_t t){portENTER_CRITICAL(&deadlineMux);until=t;portEXIT_CRITICAL(&deadlineMux);}
 bool authorized=false,uploadOK=false,hashOpen=false;uint32_t size=0,received=0;uint8_t first[288];size_t firstCount=0;mbedtls_sha256_context hash;
@@ -19,7 +19,7 @@ bool auth(bool mutate=false){
  bool viaSta=WiFi.status()==WL_CONNECTED&&local==WiFi.localIP();
  bool viaAp=maintenanceAp&&local==WiFi.softAPIP();
  if(!maintenanceActive()||(!viaSta&&!viaAp)){web.send(403,"text/plain","Mantenimiento cerrado o interfaz no autorizada.");return false;}
- if(!web.authenticate("admin",c.apPassword.c_str())){web.requestAuthentication(DIGEST_AUTH,"TARS");return false;}
+ if(!web.authenticate("admin",sessionPassword.c_str())){web.requestAuthentication(DIGEST_AUTH,"TARS");return false;}
  if(mutate&&!equal(web.header("X-CSRF-Token"),csrf)){web.send(403,"text/plain","Sesion invalida.");return false;}web.sendHeader("Cache-Control","no-store");return true;
 }
 void abortUpload(const String&s){error=s;Update.abort();localUpload=false;if(hashOpen){mbedtls_sha256_free(&hash);hashOpen=false;}}
@@ -28,11 +28,11 @@ bool startAp(){if(maintenanceAp)return true;Config c=snapshot();String id=c.id==
  WiFi.mode(WIFI_AP_STA);if(!WiFi.softAP(("TARS-"+id).c_str(),c.apPassword.c_str())){WiFi.mode(WIFI_STA);Serial.println("[MANTENIMIENTO] No se pudo crear el AP.");return false;}
  maintenanceAp=true;Serial.printf("[MANTENIMIENTO] AP TARS-%s; http://192.168.4.1\n",id.c_str());return true;
 }
-void close(){if(localUpload)abortUpload("Mantenimiento expirado");web.stop();stopAp();deadline(0);forcedAp=false;csrf="";Serial.println("[MANTENIMIENTO] Panel cerrado.");}
+void close(){if(localUpload)abortUpload("Mantenimiento expirado");web.stop();stopAp();deadline(0);forcedAp=false;csrf="";sessionPassword="";Serial.println("[MANTENIMIENTO] Panel cerrado.");}
 void open(uint32_t seconds,bool force=false){if(AmeriOta::active()||localUpload)return;
  if(!force&&WiFi.status()==WL_CONNECTED){stopAp();Serial.printf("[MANTENIMIENTO] Panel http://%s; sin AP.\n",WiFi.localIP().toString().c_str());}
  else if(!startAp())return;
- forcedAp=force;csrf=randomHex(24);deadline(nowUs()+uint64_t(seconds)*1000000);web.begin();
+ forcedAp=force;sessionPassword=snapshot().apPassword;csrf=randomHex(24);deadline(nowUs()+uint64_t(seconds)*1000000);web.begin();
 }
 void upload(){HTTPUpload&u=web.upload();
  if(u.status==UPLOAD_FILE_START){authorized=auth(true);uploadOK=false;error="";received=0;firstCount=0;if(!authorized)return;
@@ -59,7 +59,12 @@ void requestRecovery(uint32_t seconds){if(seconds>=60&&seconds<=900)requestedMai
 bool maintenanceActive(){uint64_t t=deadline();return t&&nowUs()<t;}
 uint32_t maintenanceRemaining(){uint64_t t=deadline(),n=nowUs();return t>n?uint32_t((t-n)/1000000):0;}
 void beginMaintenance(){const char*headers[]={"X-CSRF-Token","X-Firmware-Size","X-Firmware-SHA256"};web.collectHeaders(headers,3);
- web.on("/",HTTP_GET,[](){if(!auth())return;String p=FPSTR(TARS_PAGE);p.replace("__CSRF__",csrf);p.replace("__SHA_JS__",String("<script>")+FPSTR(SHA256_PAGE_JS)+"</script>");web.send(200,"text/html; charset=utf-8",p);});
+ web.on("/",HTTP_GET,[](){if(!auth())return;web.sendHeader("Content-Encoding","gzip");web.send_P(200,"text/html; charset=utf-8",reinterpret_cast<const char*>(TARS_PAGE_GZIP),sizeof TARS_PAGE_GZIP);});
+ web.on("/session",HTTP_GET,[](){if(!auth())return;JsonDocument d;d["csrf"]=csrf;String raw;serializeJson(d,raw);web.send(200,"application/json",raw);});
+ web.on("/sha.js",HTTP_GET,[](){if(auth())web.send_P(200,"application/javascript",SHA256_PAGE_JS);});
+ web.on("/pairing",HTTP_POST,[](){if(!auth(true))return;if(localUpload||AmeriOta::active()){web.send(409,"text/plain","OTA activa");return;}String e;bool ok=startPairing(web.arg("plain"),e);web.send(ok?202:409,"text/plain",ok?"Peticion guardada. Vinculacion en curso; conserve el equipo encendido.":e);});
+ web.on("/pairing/access",HTTP_GET,[](){if(!auth())return;Config c=snapshot();if(!c.controlKey.length()){web.send(409,"text/plain","Aun no hay credenciales guardadas.");return;}JsonDocument d;d["ap_password"]=c.apPassword;String raw;serializeJson(d,raw);web.send(200,"application/json",raw);});
+ web.on("/pairing",HTTP_GET,[](){if(auth())web.send(200,"application/json",pairingStatus());});
  web.on("/config",HTTP_GET,[](){if(auth())web.send(200,"application/json",configJson(snapshot(),false));});
  web.on("/config",HTTP_POST,[](){if(!auth(true))return;if(localUpload||AmeriOta::active()){web.send(409,"text/plain","OTA activa");return;}String e;bool ok=applyConfig(web.arg("plain"),e);web.send(ok?200:409,"text/plain",ok?"Configuracion completa guardada en el equipo.":e);});
  web.on("/status",HTTP_GET,[](){if(auth())web.send(200,"application/json",diagnostics());});

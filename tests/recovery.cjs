@@ -14,8 +14,9 @@ step(300000,true);step(360000,true);step(400000,false);step(460000,false);assert
 ctx.time=61000000;ctx.frame();assert.equal(ctx.on,false);assert.equal(ctx.commands.at(-1),174);
 step(62000000,true);step(62060000,true);step(66100000,true);assert.deepEqual(ctx.requests,[600]);ctx.frame();assert.equal(ctx.on,true);assert.equal(ctx.commands.at(-1),175);
 const ino=fs.readFileSync(path.join(__dirname,'../firmware/TARS/TARS.ino'),'utf8');const setup=ino.slice(ino.indexOf('void setup()'),ino.indexOf('void loop()'));
-assert(!setup.includes('requestMaintenance('),'startup must not open maintenance');
-console.log('PASS: wake sends physical ON; next click changes page; inactivity sends OFF; long press opens maintenance and wakes; no startup maintenance.');
+assert(!setup.includes('requestMaintenance('),'normal maintenance is not opened at startup');
+const initLine=setup.split('\n').find(x=>x.includes('requestRecovery(600)'));assert(initLine&&initLine.includes('id=="new"')&&initLine.includes('ssid.length()'),'initial AP requires empty identity and SSID');
+console.log('PASS: wake sends physical ON; next click changes page; inactivity sends OFF; long press opens maintenance and wakes; configured startup stays closed; empty startup AP is explicitly guarded.');
 
 
 

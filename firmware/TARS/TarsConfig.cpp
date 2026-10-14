@@ -89,13 +89,8 @@ bool loadConfig(){
   String error;JsonDocument d;encode(d,config,true);if(!decode(d.as<JsonObjectConst>(),config,error,true))return false;
   if(!write(config))return false;
  }
- // Migracion unica autorizada: clave comun de mantenimiento, sin tocar WiFi, tokens ni colas.
- if(!prefs.getBool("ap-standard-v2",false)){
-  config.apPassword="tars12345678";
-  if(config.version==UINT32_MAX)return false;
-  ++config.version;
-  if(!write(config)||!prefs.putBool("ap-standard-v2",true))return false;
- }
+ // No restablecer claves durante OTA: configuraciones existentes conservan su AP privado.
+ if(!prefs.getBool("ap-standard-v2",false)&&!prefs.putBool("ap-standard-v2",true))return false;
  syncIdentity();return true;
 }
 bool applyConfig(const String&json,String&error){
@@ -117,6 +112,32 @@ bool applyConfig(const String&json,String&error){
  config=next;syncIdentity();
  if(network){backup=old;probationAt=nowUs()+180000000;controlOk=!config.controlUrl.length();telemetryOk=false;bool enabled=false;for(auto&x:config.destinations)enabled|=x.enabled;if(!enabled)telemetryOk=true;}
  return true;
+}
+bool commitPairing(const String&payload,bool history,String&error){
+ Lock lock;if(probationAt){error="network_probation";return false;}
+ if(config.controlKey.length()){error="already_bound";return false;}
+ JsonDocument p;if(!ameriParseObject(p,payload)){error="invalid_payload";return false;}
+ Config next=config;String id=p["device_id"].as<String>();
+ if(config.id!="new"&&config.id!=id){error="identity_mismatch";return false;}
+ if(p["physical_id"].as<String>()!=WiFi.macAddress()){error="physical_mismatch";return false;}
+ next.id=id;next.controlUrl=p["control_url"].as<String>();next.controlKey=p["control_key"].as<String>();next.apPassword=p["ap_password"].as<String>();
+ if(config.version==UINT32_MAX){error="version_exhausted";return false;}next.version=config.version+1;
+ String note="saved_waiting_signed_contact";
+ if(history){
+  String url=p["history_url"].as<String>();int free=-1;bool exists=false;
+  for(unsigned i=0;i<DESTINATIONS;++i){const auto&x=next.destinations[i];exists|=url.length()&&x.url==url;
+   if(free<0&&!x.enabled&&!x.url.length()&&!delivery[i].pending&&x.auth=="none"&&!x.bearer.length()&&!x.tokenUrl.length()&&!x.user.length()&&!x.password.length()&&!x.clientId.length()&&!x.clientSecret.length()&&!x.ca.length()&&!x.service.length()&&x.path=="/"&&x.method=="POST")free=i;
+  }
+  if(!url.length())note="saved_history_not_available";
+  else if(exists)note="saved_history_already_present";
+  else if(free<0)note="saved_history_requires_free_slot";
+  else {auto&x=next.destinations[free];x.enabled=true;x.url=url;x.method="POST";x.auth="bearer";x.bearer=p["history_bearer"].as<String>();note="saved_history_added_review_orion_duplication";}
+ }
+ JsonDocument validated;encode(validated,next,true);if(!decode(validated.as<JsonObjectConst>(),next,error,true))return false;
+ // Preparar sidecar antes del único commit: solo es efectivo si coincide con la configuración confirmada.
+ if(!storeOtaBinding(next,p["ota_base_url"].as<String>(),error))return false;
+ if(!write(next)||prefs.getString("config","")!=configJson(next,true)){error="storage_failed";return false;}
+ config=next;syncIdentity();error=note;return true;
 }
 bool configProbation(){Lock lock;return probationAt!=0;}
 void networkSuccess(bool control,unsigned slot,uint32_t version){Lock lock;if(!probationAt||version!=config.version)return;unsigned primary=0;while(primary<DESTINATIONS&&!config.destinations[primary].enabled)++primary;if(control)controlOk=true;else if(slot==primary)telemetryOk=true;if(controlOk&&telemetryOk){prefs.remove("backup");backup="";probationAt=0;}}
