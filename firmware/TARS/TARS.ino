@@ -1,122 +1,50 @@
-#include <Adafruit_GFX.h> 
-#include <Adafruit_SSD1306.h> 
-#include <ArduinoJson.h> 
-#include <DFRobot_B_LUX_V30B.h> 
-#include <EEPROM.h> 
-#include <ESPmDNS.h> 
-#include <HTTPClient.h> 
-#include <WebServer.h> 
-#include <WiFi.h> 
-#include <Wire.h> 
-
-#include "AppConfig.h" 
-#include "ButtonHandler.h" 
-#include "ClosedCube_HDC1080.h" 
-#include "DisplayManager.h" 
-#include "Estados.h" 
-#include "PayloadBuilder.h" 
-#include "SensorManager.h" 
-#include "State.h" 
-#include "StateMachine.h" 
-#include "TokenManager.h" 
-#include "WiFiManager.h"
-
-#define SCREEN_WIDTH 128 
-#define SCREEN_HEIGHT 64 
-#define BUTTON_PIN 27 
-
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1); 
-ClosedCube_HDC1080 hdc1080; 
-DFRobot_B_LUX_V30B luxSensor(&Wire, 5);
-WebServer server(80); 
-AppConfig appConfig; 
-WiFiManager wifiManager; 
-TokenManager tokenManager; 
-ButtonHandler buttonHandler(BUTTON_PIN); 
-StateMachine stateMachine; 
-SensorManager sensorManager; 
-
-SET_LOOP_TASK_STACK_SIZE(16384); 
-
-// Función para mostrar la portada institucional y limpiar píxeles parásitos de arranque
-void displaySplash() {
-  display.clearDisplay();
-  display.setTextColor(SSD1306_WHITE);
-  
-  // Encabezado institucional
-  display.setTextSize(2);
-  display.setCursor(18, 8);
-  display.println("AgeVital");
-  
-  // Nombre configurado del dispositivo (ej: tars1, moreha1, etc.)
-  display.setTextSize(1);
-  display.setCursor(15, 30);
-  if (appConfig.hostname.length() > 0) {
-    display.print("Nodo: ");
-    display.println(appConfig.hostname);
-  } else {
-    display.println("PROYECTO TARS");
-  }
-  
-  display.setCursor(15, 48);
-  display.println("Iniciando nodo...");
-  
-  display.display();
-  delay(1500); // Pausa para visualizar la portada en el arranque
+#include "Tars.h"
+#include "AmeriIdentity.h"
+#include "AmeriOta.h"
+#include <WiFi.h>
+#include <esp_ota_ops.h>
+#include <esp_timer.h>
+#include <time.h>
+SET_LOOP_TASK_STACK_SIZE(16384);
+String serialCommand;
+void serialDiagnostics(){
+ while(Serial.available()){char ch=Serial.read();if(ch=='\r'||ch=='\n'){
+  serialCommand.trim();if(serialCommand.equalsIgnoreCase("WIFI")){
+   auto c=Tars::snapshot();String id=c.id=="new"?"NEW-"+WiFi.macAddress().substring(9):c.id;id.replace(":","");
+   Serial.printf("[MANTENIMIENTO] Usuario admin; clave: %s\n",c.apPassword.c_str());
+   if(WiFi.status()==WL_CONNECTED)Serial.printf("Pagina en la red actual: http://%s\n",WiFi.localIP().toString().c_str());
+   else Serial.printf("AP: TARS-%s; pagina: http://192.168.4.1\n",id.c_str());
+   Tars::requestMaintenance(600);
+  }serialCommand="";
+ }else if(serialCommand.length()<32)serialCommand+=ch;}
 }
-
-void setup() { 
-  Serial.begin(115200); 
-
-  Wire.begin(21, 22);
-  Wire.setTimeOut(1000); 
-  Wire.setClock(50000); 
-
-  // 1. Cargar configuración desde memoria EEPROM/NVS
-  appConfig.begin();
-
-  // 2. Inicializar pantalla OLED y mostrar portada de inmediato
-  if (display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
-    displaySplash();
-  } else {
-    Serial.println("[DISPLAY] Error al iniciar SSD1306");
-  }
-
-  // 3. Inicializar sensores periféricos
-  hdc1080.begin(0x40); 
-  luxSensor.begin(); 
-  analogReadResolution(12);
-
-  // 4. Inicializar subsistemas y máquina de estados
-  buttonHandler.begin();
-  sensorManager.begin();
-  stateMachine.begin(new EstadoINICIO()); 
+bool started=false,otaStarted=false;uint64_t bootAt=0,nextOtaAttempt=0;
+void setup(){
+ Serial.begin(115200);Tars::mutex=xSemaphoreCreateRecursiveMutex();
+ if(!Tars::mutex){AmeriOta::rollbackIfPending();return;}
+ WiFi.mode(WIFI_STA);WiFi.persistent(false);WiFi.setSleep(true);
+ if(!Tars::loadConfig()){Serial.println("[TARS] Configuracion invalida; no se borra ni sustituye.");AmeriOta::rollbackIfPending();return;}
+ Tars::beginNetwork();Tars::beginSensors();Tars::beginMaintenance();
+ configTime(0,0,Tars::config.ntpServer.c_str(),Tars::config.ntpFallback.c_str());
+ TaskHandle_t sensors=nullptr,network=nullptr;
+ if(xTaskCreatePinnedToCore(Tars::sensorTask,"tars-sensors",8192,nullptr,2,&sensors,1)!=pdPASS||xTaskCreatePinnedToCore(Tars::networkTask,"tars-network",16384,nullptr,1,&network,0)!=pdPASS){Serial.println("[TARS] No se pudieron crear tareas.");AmeriOta::rollbackIfPending();return;}
+ bootAt=Tars::nowUs();started=true;
+ // El mantenimiento solo se abre por boton, serie o comando autenticado, nunca al arrancar.
+ Serial.println("[TARS] 4.0.4: Escriba WIFI + Enter en serie para abrir mantenimiento y consultar su clave local.");
+ Serial.println("[TARS] Arranque; diagnostico sin credenciales. Boton 4s: mantenimiento. Boton 10s: AP de recuperacion 10min.");
 }
-
-void loop() { 
-  ButtonHandler::Event event = buttonHandler.update();
-
-  if (event != ButtonHandler::NONE) { 
-    // Actualizamos el reloj de interacción siempre que se presione el botón
-    stateMachine.clocks.ultima_interaccion = millis();
-    
-    // Si la pantalla estaba apagada, la despertamos
-    if (!stateMachine.isDisplayOn) {
-      stateMachine.isDisplayOn = true;
-      stateMachine.needsUpdate = true;
-      
-      // Si el evento fue un clic corto para despertar la pantalla, 
-      // lo anulamos para que NO avance a la siguiente vista de sensores
-      if (event == ButtonHandler::SHORT_PRESS) {
-        event = ButtonHandler::NONE; 
-      }
-    }
+void loop(){if(!started){delay(100);return;}
+ serialDiagnostics();Tars::maintenanceLoop();Tars::configTick();static Tars::Config c=Tars::snapshot();if(c.version!=Tars::configVersion()){c=Tars::snapshot();configTime(0,0,c.ntpServer.c_str(),c.ntpFallback.c_str());}
+ if(Ameri::identity.bound&&!otaStarted&&Tars::nowUs()>=nextOtaAttempt){nextOtaAttempt=Tars::nowUs()+60000000;otaStarted=AmeriOta::begin();}
+ Tars::Reading r;{Tars::Lock lock;r=Tars::reading;}
+ bool sensorOK=r.uptimeUs&&Tars::nowUs()-r.uptimeUs<uint64_t(c.readMs)*2000&&(r.failures&7)!=7;
+ if(otaStarted){AmeriOta::Safety s(Tars::maintenanceActive()||Tars::localUpload||Tars::configProbation(),true,Tars::storageReady&&sensorOK,Tars::pendingCount());s.otaEnabled=c.otaEnabled;AmeriOta::Network n;n.base=c.controlUrl;n.ca=c.ca;AmeriOta::tick(s,n,Tars::persistBoundary);}
+ else { // Primera migracion por OTA clasica, aun sin clave de control provisionada.
+  esp_ota_img_states_t state;if(esp_ota_get_state_partition(esp_ota_get_running_partition(),&state)==ESP_OK&&state==ESP_OTA_IMG_PENDING_VERIFY){
+   if(Tars::storageReady&&sensorOK&&Tars::nowUs()-bootAt>10000000)esp_ota_mark_app_valid_cancel_rollback();
+   else if(Tars::nowUs()-bootAt>90000000)AmeriOta::rollbackIfPending();
   }
-
-  // Pasamos el evento a los estados
-  stateMachine.currentEvent = event;
-  stateMachine.update(); 
-  stateMachine.currentEvent = ButtonHandler::NONE; // Limpiamos el evento
-
-  yield(); // Alimentar el Watchdog de FreeRTOS
+ }
+ static uint64_t lastLog=0;if(Tars::nowUs()-lastLog>=10000000){lastLog=Tars::nowUs();Serial.printf("[ESTADO] uptime=%lus muestra=%lluus fallos=0x%X wifi=%s AP=%s RAM=%u\n",millis()/1000,(unsigned long long)r.uptimeUs,r.failures,WiFi.status()==WL_CONNECTED?"OK":"DESCONECTADO",((WiFi.getMode() & WIFI_AP)!=0)?"ON":"OFF",ESP.getFreeHeap());}
+ delay(50);
 }

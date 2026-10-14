@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="750" viewBox="0 0 1200 750" role="img"><title>TARS · arquitectura 4.0.4</title><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#64748b"/></marker></defs><rect width="1200" height="750" rx="24" fill="#f8fafc"/>
+<text x="45" y="52" font-family="Arial,Helvetica,sans-serif" font-size="30" fill="#0f172a">TARS · arquitectura 4.0.4</text>
+<text x="45" y="84" font-family="Arial,Helvetica,sans-serif" font-size="16" fill="#475569">Lectura independiente · ventanas de muestras · cuatro destinos HTTPS · mantenimiento temporal</text>
+<rect x="40" y="130" width="280" height="170" rx="14" fill="#fff" stroke="#cbd5e1" stroke-width="2"/>
+<text x="58" y="162" font-family="Arial,Helvetica,sans-serif" font-size="20" fill="#0f172a">Sensores</text>
+<text x="58" y="190" font-family="Arial,Helvetica,sans-serif" font-size="16" fill="#475569">HDC1080 · °C / %</text>
+<text x="58" y="214" font-family="Arial,Helvetica,sans-serif" font-size="16" fill="#475569">B-LUX-V30B · lux</text>
+<text x="58" y="238" font-family="Arial,Helvetica,sans-serif" font-size="16" fill="#475569">ADC GPIO35 · voltaje</text>
+<rect x="380" y="130" width="350" height="170" rx="14" fill="#ecfdf5" stroke="#10b981" stroke-width="2"/>
+<text x="398" y="162" font-family="Arial,Helvetica,sans-serif" font-size="20" fill="#0f172a">Tarea de sensores · core 1</text>
+<text x="398" y="190" font-family="Arial,Helvetica,sans-serif" font-size="16" fill="#475569">Lectura 5 s / ventana 60 s</text>
+<text x="398" y="214" font-family="Arial,Helvetica,sans-serif" font-size="16" fill="#475569">I²C y cambios CPU serializados</text>
+<text x="398" y="238" font-family="Arial,Helvetica,sans-serif" font-size="16" fill="#475569">OLED y botón; calidad / secuencia</text>
+<rect x="790" y="130" width="365" height="170" rx="14" fill="#fff" stroke="#cbd5e1" stroke-width="2"/>
+<text x="808" y="162" font-family="Arial,Helvetica,sans-serif" font-size="20" fill="#0f172a">OLED + botón</text>
+<text x="808" y="190" font-family="Arial,Helvetica,sans-serif" font-size="16" fill="#475569">Clic: despertar / página</text>
+<text x="808" y="214" font-family="Arial,Helvetica,sans-serif" font-size="16" fill="#475569">4 s: mantenimiento normal</text>
+<text x="808" y="238" font-family="Arial,Helvetica,sans-serif" font-size="16" fill="#475569">10 s: AP de recuperación</text>
+<path d="M320 210 L380 210" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+<path d="M730 210 L790 210" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+<rect x="40" y="370" width="280" height="165" rx="14" fill="#fff" stroke="#cbd5e1" stroke-width="2"/>
+<text x="58" y="402" font-family="Arial,Helvetica,sans-serif" font-size="20" fill="#0f172a">Configuración · NVS</text>
+<text x="58" y="430" font-family="Arial,Helvetica,sans-serif" font-size="16" fill="#475569">WiFi / identidad / calibración</text>
+<text x="58" y="454" font-family="Arial,Helvetica,sans-serif" font-size="16" fill="#475569">URLs y credenciales privadas</text>
+<text x="58" y="478" font-family="Arial,Helvetica,sans-serif" font-size="16" fill="#475569">Validación y prueba de red</text>
+<rect x="380" y="370" width="350" height="165" rx="14" fill="#fff" stroke="#cbd5e1" stroke-width="2"/>
+<text x="398" y="402" font-family="Arial,Helvetica,sans-serif" font-size="20" fill="#0f172a">Colas · SPIFFS</text>
+<text x="398" y="430" font-family="Arial,Helvetica,sans-serif" font-size="16" fill="#475569">Máximo 32 registros / destino</text>
+<text x="398" y="454" font-family="Arial,Helvetica,sans-serif" font-size="16" fill="#475569">Persistir antes del envío</text>
+<text x="398" y="478" font-family="Arial,Helvetica,sans-serif" font-size="16" fill="#475569">Borrar solo tras HTTP 2xx</text>
+<rect x="790" y="370" width="365" height="165" rx="14" fill="#eff6ff" stroke="#3b82f6" stroke-width="2"/>
+<text x="808" y="402" font-family="Arial,Helvetica,sans-serif" font-size="20" fill="#0f172a">Tarea de red · core 0</text>
+<text x="808" y="430" font-family="Arial,Helvetica,sans-serif" font-size="16" fill="#475569">TLS verificado + UTC</text>
+<text x="808" y="454" font-family="Arial,Helvetica,sans-serif" font-size="16" fill="#475569">Reintentos independientes</text>
+<text x="808" y="478" font-family="Arial,Helvetica,sans-serif" font-size="16" fill="#475569">Control HMAC V2 / OTA AMERI1</text>
+<path d="M555 300 L555 370" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+<path d="M730 450 L790 450" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+<rect x="40" y="600" width="690" height="105" rx="14" fill="#f5f3ff" stroke="#8b5cf6" stroke-width="2"/>
+<text x="58" y="632" font-family="Arial,Helvetica,sans-serif" font-size="20" fill="#0f172a">Panel temporal · usuario admin</text>
+<text x="58" y="660" font-family="Arial,Helvetica,sans-serif" font-size="16" fill="#475569">STA si conectado; AP si desconectado o recuperación forzada. Plazo 10 min.</text>
+<rect x="790" y="600" width="365" height="105" rx="14" fill="#fff" stroke="#cbd5e1" stroke-width="2"/>
+<text x="808" y="632" font-family="Arial,Helvetica,sans-serif" font-size="20" fill="#0f172a">Servidores</text>
+<text x="808" y="660" font-family="Arial,Helvetica,sans-serif" font-size="16" fill="#475569">Orion NGSIv2 / otros receptores</text>
+<text x="808" y="684" font-family="Arial,Helvetica,sans-serif" font-size="16" fill="#475569">Deduplicar ID + boot_id + sequence</text>
+<path d="M950 535 L950 600" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+<path d="M180 600 L180 535" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#arrow)"/></svg>

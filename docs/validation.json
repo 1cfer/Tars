@@ -1,0 +1,12 @@
+{
+  "arduino_esp32": "3.3.12",
+  "idf": "v5.5.5",
+  "project": "TARS",
+  "version": "4.0.4",
+  "chip_id": 0,
+  "size": 1296672,
+  "slot_bytes": 1310720,
+  "sha256": "290af215cf146582389cf3e82e3455b40bf0e90d4aab8a04adcada837b58300a",
+  "hardware_tested": false,
+  "physical_ota_tested": false
+}

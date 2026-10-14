@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="790" viewBox="0 0 1200 790" role="img"><title>TARS · conexiones lógicas</title><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#64748b"/></marker></defs><rect width="1200" height="790" rx="24" fill="#f8fafc"/>
+<text x="45" y="52" font-family="Arial,Helvetica,sans-serif" font-size="30" fill="#0f172a">TARS · conexiones lógicas</text>
+<text x="45" y="84" font-family="Arial,Helvetica,sans-serif" font-size="16" fill="#475569">ESP32-WROOM-DA / ESP32 clásico · validar pinout y alimentación de la PCB antes de conectar</text>
+<rect x="440" y="165" width="315" height="375" rx="14" fill="#eff6ff" stroke="#3b82f6" stroke-width="2"/>
+<text x="458" y="197" font-family="Arial,Helvetica,sans-serif" font-size="20" fill="#0f172a">ESP32-WROOM-DA</text>
+<text x="458" y="225" font-family="Arial,Helvetica,sans-serif" font-size="16" fill="#475569">GPIO21 · SDA</text>
+<text x="458" y="249" font-family="Arial,Helvetica,sans-serif" font-size="16" fill="#475569">GPIO22 · SCL</text>
+<text x="458" y="273" font-family="Arial,Helvetica,sans-serif" font-size="16" fill="#475569">GPIO5 · EN luz</text>
+<text x="458" y="297" font-family="Arial,Helvetica,sans-serif" font-size="16" fill="#475569">GPIO35 · ADC sonido</text>
+<text x="458" y="321" font-family="Arial,Helvetica,sans-serif" font-size="16" fill="#475569">GPIO27 · botón a GND</text>
+<text x="458" y="345" font-family="Arial,Helvetica,sans-serif" font-size="16" fill="#475569">GND · referencia común</text>
+<text x="458" y="369" font-family="Arial,Helvetica,sans-serif" font-size="16" fill="#475569">Señales GPIO a 3,3 V</text>
+<rect x="40" y="140" width="330" height="100" rx="14" fill="#fff" stroke="#cbd5e1" stroke-width="2"/>
+<text x="58" y="172" font-family="Arial,Helvetica,sans-serif" font-size="20" fill="#0f172a">OLED SSD1306 · 128×64</text>
+<text x="58" y="200" font-family="Arial,Helvetica,sans-serif" font-size="16" fill="#475569">I²C 0x3C · SDA / SCL</text>
+<path d="M370 195 L440 195" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+<rect x="40" y="280" width="330" height="100" rx="14" fill="#fff" stroke="#cbd5e1" stroke-width="2"/>
+<text x="58" y="312" font-family="Arial,Helvetica,sans-serif" font-size="20" fill="#0f172a">HDC1080</text>
+<text x="58" y="340" font-family="Arial,Helvetica,sans-serif" font-size="16" fill="#475569">I²C 0x40 · SDA / SCL</text>
+<path d="M370 335 L440 215" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+<rect x="40" y="420" width="330" height="120" rx="14" fill="#fff" stroke="#cbd5e1" stroke-width="2"/>
+<text x="58" y="452" font-family="Arial,Helvetica,sans-serif" font-size="20" fill="#0f172a">B-LUX-V30B</text>
+<text x="58" y="480" font-family="Arial,Helvetica,sans-serif" font-size="16" fill="#475569">I²C 0x4A · SDA / SCL</text>
+<text x="58" y="504" font-family="Arial,Helvetica,sans-serif" font-size="16" fill="#475569">EN controlado por GPIO5</text>
+<path d="M370 475 L440 250" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+<rect x="810" y="165" width="345" height="120" rx="14" fill="#fff" stroke="#cbd5e1" stroke-width="2"/>
+<text x="828" y="197" font-family="Arial,Helvetica,sans-serif" font-size="20" fill="#0f172a">Sensor de sonido</text>
+<text x="828" y="225" font-family="Arial,Helvetica,sans-serif" font-size="16" fill="#475569">Salida analógica → GPIO35</text>
+<text x="828" y="249" font-family="Arial,Helvetica,sans-serif" font-size="16" fill="#475569">No exceder tensión del ADC</text>
+<path d="M810 225 L755 295" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+<rect x="810" y="345" width="345" height="100" rx="14" fill="#fff" stroke="#cbd5e1" stroke-width="2"/>
+<text x="828" y="377" font-family="Arial,Helvetica,sans-serif" font-size="20" fill="#0f172a">Botón físico</text>
+<text x="828" y="405" font-family="Arial,Helvetica,sans-serif" font-size="16" fill="#475569">GPIO27 ↔ botón ↔ GND</text>
+<path d="M810 395 L755 330" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+<rect x="40" y="600" width="1115" height="130" rx="14" fill="#fff7ed" stroke="#f97316" stroke-width="2"/>
+<text x="58" y="632" font-family="Arial,Helvetica,sans-serif" font-size="20" fill="#0f172a">Alimentación y bus</text>
+<text x="58" y="660" font-family="Arial,Helvetica,sans-serif" font-size="16" fill="#475569">GND común. Verificar VCC de cada módulo y pull-ups SDA/SCL a 3,3 V.</text>
+<text x="58" y="684" font-family="Arial,Helvetica,sans-serif" font-size="16" fill="#475569">OLED especificado 3,3–5 V; no implica GPIO tolerantes a 5 V. Bus 50 kHz.</text>
+<text x="58" y="708" font-family="Arial,Helvetica,sans-serif" font-size="16" fill="#475569">Este esquema no sustituye al circuito eléctrico ni define pines físicos de los conectores JST.</text></svg>

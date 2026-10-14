@@ -1,0 +1,8 @@
+build/
+*.bin
+*.elf
+*.map
+*.local.*
+*Secrets.h
+*credentials*.json
+CONFIG_PRIVADA*.json
