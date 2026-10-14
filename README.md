@@ -3,7 +3,7 @@
 # TARS
 ### Monitoreo ambiental con ESP32 · FIWARE · mantenimiento sin cables
 
-![Firmware](https://img.shields.io/badge/firmware-4.1.0-0f766e)
+![Firmware](https://img.shields.io/badge/firmware-4.1.1-0f766e)
 ![ESP32](https://img.shields.io/badge/ESP32-WROOM--DA-2563eb)
 ![Arduino](https://img.shields.io/badge/Arduino_ESP32-3.3.12-00979d)
 ![Contrato](https://img.shields.io/badge/telemetría-NGSIv2-7c3aed)
@@ -20,7 +20,7 @@
 
 TARS mide temperatura, humedad relativa, iluminancia y señal de sonido. Muestra valores en una OLED SSD1306 y envía ventanas de muestras válidas como atributos NGSIv2. Está orientado a prototipos de monitoreo ambiental y comparación de condiciones en espacios interiores.
 
-La versión 4.1.0 usa tareas independientes de lectura y red, hasta cuatro destinos HTTPS, colas persistentes y mantenimiento temporal por botón. Una petición HTTPS no ejecuta la lectura de sensores. El firmware conserva la medición durante mantenimiento.
+La versión 4.1.1 usa tareas independientes de lectura y red, hasta cuatro destinos HTTPS, colas persistentes y mantenimiento temporal por botón. Una petición HTTPS no ejecuta la lectura de sensores. El firmware conserva la medición durante mantenimiento.
 
 **Estado:** compilación para ESP32 3.3.12 y pruebas de lógica verificadas; esta versión necesita validación física en un TARS antes de un despliegue en lote. La comunicación I²C y la lectura del HDC1080 deben comprobarse en cada equipo. El firmware no convierte este prototipo en un instrumento meteorológico o acústico certificado.
 
@@ -38,9 +38,9 @@ La versión 4.1.0 usa tareas independientes de lectura y red, hasta cuatro desti
 
 La pulsación de 10 segundos primero pasa por la acción de 4 segundos. La cuenta de recuperación comienza al llegar a los 10 segundos. Mantener el botón no renueva continuamente el plazo. Al soltarlo no se genera un clic adicional.
 
-**AP:** `TARS-{identificador}` o `TARS-NEW-{sufijo MAC}`. **Dirección:** `http://192.168.4.1`. **Clave inicial del AP:** `tars12345678`. **Panel:** usuario `admin`, misma contraseña del AP. Se puede cambiar desde el panel; una clave vacía conserva la existente. Las versiones 4.0.2–4.0.4 aplicaban una migración única de esa clave; 4.1.0 conserva las claves ya guardadas.
+**AP:** `TARS-{identificador}` o `TARS-NEW-{sufijo MAC}`. **Dirección:** `http://192.168.4.1`. **Clave inicial del AP:** `tars12345678`. **Panel:** usuario `admin`, misma contraseña del AP. Se puede cambiar desde el panel; una clave vacía conserva la existente. Las versiones 4.0.2–4.0.4 aplicaban una migración única de esa clave; 4.1.1 conserva las claves ya guardadas.
 
-Tras vincular con AMERI, el servidor entrega una **clave individual** de mantenimiento. La clave común es solamente inicial. La actualización 4.1.0 conserva las claves existentes; no las vuelve a poner en el valor de fábrica.
+Tras vincular con AMERI, el servidor entrega una **clave individual** de mantenimiento. La clave común es solamente inicial. La actualización 4.1.1 conserva las claves existentes; no las vuelve a poner en el valor de fábrica.
 
 El AP forzado usa AP+STA: conserva la conexión principal y no cambia sus credenciales. Cuando termina el plazo, cierra AP y panel. El modo normal retira el AP si vuelve la conexión principal; el modo forzado lo mantiene hasta que expire o se cierre. Una carga OTA en curso pospone los cambios de interfaz; el plazo de mantenimiento sigue vigente.
 
@@ -92,14 +92,14 @@ También se conserva la provisión manual: control y OTA desde servidor requiere
 | OLED SSD1306 128×64 | SDA GPIO21 · SCL GPIO22 · `0x3C` (también se prueba `0x3D`) | Visualización |
 | HDC1080 | Mismo I²C · `0x40` | Temperatura °C y humedad % |
 | DFRobot B-LUX-V30B | Mismo I²C · `0x4A` · EN GPIO5 | Iluminancia en lux |
-| Sensor de sonido analógico | GPIO35, entrada ADC | Voltaje; estimación según calibración |
+| DFRobot SEN0232 | GPIO35, entrada ADC | Nivel sonoro dBA; salida 0,6–2,6 V |
 | Botón | GPIO27 a GND, `INPUT_PULLUP` | Navegación, mantenimiento y recuperación |
 
 SDA y SCL comparten bus a 50 kHz. Cambios de frecuencia CPU y acceso I²C se realizan por la tarea de sensores, entre transferencias. Se comprueba cada bloque de imagen OLED y se reintenta ante NACK.
 
 **Alimentación:** GND común. La descripción del OLED permite VCC 3,3–5 V, pero las señales del ESP32 deben mantenerse a 3,3 V; comprobar a qué tensión están las resistencias pull-up. No conectar un sensor o alimentación a un GPIO suponiendo que puede entregar potencia. El esquema es lógico, no reemplaza el esquema eléctrico de la PCB ni confirma polaridad de conectores JST. GPIO35 no admite 5 V. Verifica tensión y pinout de cada módulo antes de conectarlo.
 
-La variante PM1/PM2.5/PM10 que aparece en algunas fotos es experimental y **no está implementada en este firmware**. El sensor acústico analógico no está identificado como sonómetro: la estimación por voltaje no equivale a dBA, ponderación frecuencial o Leq. `noise` permanece nulo si no se declara calibración verificada; esa declaración tampoco certifica el instrumento.
+La variante PM1/PM2.5/PM10 que aparece en algunas fotos es experimental y **no está implementada en este firmware**. El sensor acústico confirmado es **DFRobot SEN0232**, ponderación A y constante temporal 125 ms. Conversión del fabricante: **dBA = V × 50** (0,6–2,6 V → 30–130 dBA). `noise` contiene el promedio aritmético de muestras válidas del intervalo, **no Leq**; no captura todos los picos entre lecturas. La marca de configuración `noise_verified` indica contraste de campo; la conversión 50/0 usa la base de fábrica. La calidad distingue fábrica y campo; ajustes personalizados no contrastados mantienen `noise=null`. [Integración y fuentes oficiales](docs/guides/SEN0232.md).
 
 ## Arquitectura
 
@@ -133,8 +133,8 @@ flowchart LR
 | `humidity` | %, promedio válido con offset configurable |
 | `illuminance` | lux, mediana y promedio válido |
 | `noise_voltage` | V, señal analógica |
-| `noise_estimate_db` | Estimación por voltaje; no es medición acústica normalizada |
-| `noise` | Estimación habilitada por `noise_verified`; nulo por defecto |
+| `noise_estimate_db` | Alias conservado por compatibilidad; preferir `noise` y su metadato |
+| `noise` | SEN0232, dBA: promedio de muestras válidas, ponderación A/Fast; no Leq |
 | `interval_seconds`, `sample_count` | Duración efectiva y número de muestras |
 | `quality_flags`, `invalid_measurements` | Calidad, conteos válidos y máscara de fallos |
 | `boot_id`, `sequence`, `observedAt` | Identificación y fecha UTC cuando existe sincronización |
@@ -147,7 +147,7 @@ CPU 80 MHz por defecto, ahorro WiFi, brillo OLED 32/255 y apagado a los 60 s de 
 
 ## Fotografías y hardware
 
-Fotografías reales ya incluidas en el proyecto; muestran revisiones anteriores y no son capturas de validación del firmware 4.1.0.
+Fotografías reales ya incluidas en el proyecto; muestran revisiones anteriores y no son capturas de validación del firmware 4.1.1.
 
 <table><tr><td><img src="docs/3-tars.jpg" alt="Lote de TARS" width="330"/></td><td><img src="docs/2-pcbv1.jpg" alt="PCB y conexiones de una revisión anterior" width="330"/></td></tr><tr><td><img src="docs/8-carcasa.jpg" alt="Carcasa TARS" width="330"/></td><td><img src="docs/6-pcbv2.jpg" alt="PCB experimental" width="330"/></td></tr></table>
 
@@ -162,7 +162,15 @@ Carcasas imprimibles en [`hardware/`](hardware/). Diagramas SVG editables en [`d
 - Después de 10 min, panel y AP cerrados; lecturas y envío continúan.
 - Validar HDC1080, estabilidad OLED, HTTPS, conservación tras reinicio y OTA real en un equipo.
 
-Pruebas de lógica con Node.js: `node tests/recovery.cjs`, `node tests/display.cjs` y `node tests/pairing.cjs`. Usan funciones extraídas del fuente con hardware simulado; no sustituyen pruebas físicas. [Resultados de compilación](docs/validation.json).
+Pruebas de lógica con Node.js: `node tests/recovery.cjs`, `node tests/display.cjs` y `node tests/pairing.cjs` y `node tests/sound.cjs`. Usan funciones extraídas del fuente con hardware simulado; no sustituyen pruebas físicas. [Resultados de compilación](docs/validation.json).
+
+## Ramas y versiones
+
+- `develop`: integración de cambios y pruebas; el nombre no depende de la versión.
+- `main`: versiones que los responsables hayan validado y fusionado.
+- La versión de firmware se define en `firmware/TARS/AmeriProfile.h` y en el changelog.
+
+Antes de fusionar una nueva versión, probarla en un TARS. Los commits futuros de esta copia usan la identidad Git de `1cfer` con su correo privado de GitHub. La autoría de commits y la autenticación para publicar son configuraciones distintas.
 
 ## Contribuir
 

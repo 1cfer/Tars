@@ -31,7 +31,7 @@ void setup(){
  bootAt=Tars::nowUs();started=true;
  // Primera configuracion vacia: AP inicial; equipos configurados conservan mantenimiento temporal.
  if(Tars::snapshot().id=="new"&&!Tars::snapshot().ssid.length())Tars::requestRecovery(600);
- Serial.println("[TARS] 4.1.0: Escriba WIFI + Enter en serie para abrir mantenimiento y consultar su clave local.");
+ Serial.println("[TARS] 4.1.1: Escriba WIFI + Enter en serie para abrir mantenimiento y consultar su clave local.");
  Serial.println("[TARS] Arranque; diagnostico sin credenciales. Boton 4s: mantenimiento. Boton 10s: AP de recuperacion 10min.");
 }
 void loop(){if(!started){delay(100);return;}

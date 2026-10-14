@@ -1,5 +1,13 @@
 # Cambios
 
+## 4.1.1
+
+- Sensor confirmado SEN0232: OLED/panel/telemetría en dBA, con ponderación A y constante de hardware 125 ms.
+- Conversión de fábrica 50 dBA/V, ajustes locales conservados y valores fuera de rango como null.
+- Calidad distingue conversión de fábrica y contraste de campo, manteniendo compatibilidad con el receptor.
+- Promedio de muestras documentado como distinto de Leq; datos antiguos en cola conservados.
+- Sin pruebas físicas de calibración.
+
 ## 4.1.0
 
 - Vinculación AMERI pairing 1 desde el panel, con código temporal y petición persistente idéntica en reintentos.

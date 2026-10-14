@@ -1,5 +1,5 @@
 {
-  "firmware": "4.1.0",
+  "firmware": "4.1.1",
   "pairing_source_derived_guards": "passed_with_mocked_Arduino_types",
   "oled_and_button_logic": "passed",
   "server_public_hmac_vectors": "passed",
@@ -14,5 +14,8 @@
   "physical_ota_tested": false,
   "power_loss_nvs_tested": false,
   "wifi_https_from_upbwifi_tested": false,
-  "keyrock_physical_tested": false
+  "keyrock_physical_tested": false,
+  "sound_transfer_source_derived_tests": "passed",
+  "noise_receiver_temporary_db_integration": "passed",
+  "physical_acoustic_calibration_tested": false
 }

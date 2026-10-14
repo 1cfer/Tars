@@ -1,6 +1,6 @@
 #pragma once
 #define AMERI_FAMILY "tars"
 #define AMERI_PROJECT "TARS"
-#define AMERI_VERSION "4.1.0"
+#define AMERI_VERSION "4.1.1"
 #define AMERI_BOARD "upb-tars-esp32-v1"
 #define AMERI_CHIP_ID 0

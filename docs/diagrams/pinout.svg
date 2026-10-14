@@ -24,8 +24,8 @@
 <text x="58" y="504" font-family="Arial,Helvetica,sans-serif" font-size="16" fill="#475569">EN controlado por GPIO5</text>
 <path d="M370 475 L440 250" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
 <rect x="810" y="165" width="345" height="120" rx="14" fill="#fff" stroke="#cbd5e1" stroke-width="2"/>
-<text x="828" y="197" font-family="Arial,Helvetica,sans-serif" font-size="20" fill="#0f172a">Sensor de sonido</text>
-<text x="828" y="225" font-family="Arial,Helvetica,sans-serif" font-size="16" fill="#475569">Salida analógica → GPIO35</text>
+<text x="828" y="197" font-family="Arial,Helvetica,sans-serif" font-size="20" fill="#0f172a">SEN0232</text>
+<text x="828" y="225" font-family="Arial,Helvetica,sans-serif" font-size="16" fill="#475569">A: 0,6–2,6 V → GPIO35</text>
 <text x="828" y="249" font-family="Arial,Helvetica,sans-serif" font-size="16" fill="#475569">No exceder tensión del ADC</text>
 <path d="M810 225 L755 295" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
 <rect x="810" y="345" width="345" height="100" rx="14" fill="#fff" stroke="#cbd5e1" stroke-width="2"/>
