@@ -10,7 +10,18 @@
 #include <mbedtls/sha256.h>
 namespace Tars {
 namespace {
-WebServer web(80);uint64_t until=0;portMUX_TYPE deadlineMux=portMUX_INITIALIZER_UNLOCKED;bool maintenanceAp=false,forcedAp=false;String sessionPassword,csrf,error,expectedHash;uint64_t rebootAt=0;
+// A single Digest challenge per maintenance session: parallel resources must not
+// invalidate each other's nonce in WebServer 3.3.12.
+class PanelServer:public WebServer {
+ public:PanelServer():WebServer(80){}
+ void resetAuth(){_snonce="";_sopaque="";}
+ void challenge(){
+  if(!_snonce.length()){_snonce=randomHex(16);_sopaque=randomHex(16);_srealm="TARS";}
+  sendHeader("WWW-Authenticate",String("Digest realm=\"TARS\", qop=\"auth\", nonce=\"")+_snonce+"\", opaque=\""+_sopaque+"\"");
+  send(401,"text/plain","Autenticacion requerida");
+ }
+};
+PanelServer web;uint64_t until=0;portMUX_TYPE deadlineMux=portMUX_INITIALIZER_UNLOCKED;bool maintenanceAp=false,forcedAp=false;String sessionPassword,csrf,error,expectedHash;uint64_t rebootAt=0;
 uint64_t deadline(){portENTER_CRITICAL(&deadlineMux);uint64_t t=until;portEXIT_CRITICAL(&deadlineMux);return t;}
 void deadline(uint64_t t){portENTER_CRITICAL(&deadlineMux);until=t;portEXIT_CRITICAL(&deadlineMux);}
 bool authorized=false,uploadOK=false,hashOpen=false;uint32_t size=0,received=0;uint8_t first[288];size_t firstCount=0;mbedtls_sha256_context hash;
@@ -19,7 +30,7 @@ bool auth(bool mutate=false){
  bool viaSta=WiFi.status()==WL_CONNECTED&&local==WiFi.localIP();
  bool viaAp=maintenanceAp&&local==WiFi.softAPIP();
  if(!maintenanceActive()||(!viaSta&&!viaAp)){web.send(403,"text/plain","Mantenimiento cerrado o interfaz no autorizada.");return false;}
- if(!web.authenticate("admin",sessionPassword.c_str())){if(web.uri()=="/")web.requestAuthentication(DIGEST_AUTH,"TARS");else web.send(403,"text/plain","Acceso rechazado. Abra el panel con la clave actual.");return false;}
+ if(!web.authenticate("admin",sessionPassword.c_str())){web.challenge();return false;}
  if(mutate&&!equal(web.header("X-CSRF-Token"),csrf)){web.send(403,"text/plain","Sesion invalida.");return false;}web.sendHeader("Cache-Control","no-store");return true;
 }
 void abortUpload(const String&s){error=s;Update.abort();localUpload=false;if(hashOpen){mbedtls_sha256_free(&hash);hashOpen=false;}}
@@ -28,7 +39,7 @@ bool startAp(){if(maintenanceAp)return true;Config c=snapshot();String id=c.id==
  WiFi.mode(WIFI_AP_STA);if(!WiFi.softAP(("TARS-"+id).c_str(),c.apPassword.c_str())){WiFi.mode(WIFI_STA);Serial.println("[MANTENIMIENTO] No se pudo crear el AP.");return false;}
  maintenanceAp=true;Serial.printf("[MANTENIMIENTO] AP TARS-%s; http://192.168.4.1\n",id.c_str());return true;
 }
-void close(){if(localUpload)abortUpload("Mantenimiento expirado");web.stop();stopAp();deadline(0);forcedAp=false;csrf="";sessionPassword="";Serial.println("[MANTENIMIENTO] Panel cerrado.");}
+void close(){if(localUpload)abortUpload("Mantenimiento expirado");web.stop();stopAp();deadline(0);forcedAp=false;csrf="";sessionPassword="";web.resetAuth();Serial.println("[MANTENIMIENTO] Panel cerrado.");}
 void open(uint32_t seconds,bool force=false){if(AmeriOta::active()||localUpload)return;
  if(!force&&!persistenceFault()&&WiFi.status()==WL_CONNECTED){stopAp();Serial.printf("[MANTENIMIENTO] Panel http://%s; sin AP.\n",WiFi.localIP().toString().c_str());}
  else if(!startAp())return;

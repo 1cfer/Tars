@@ -15,7 +15,7 @@ reset();entries.delete('cfg_blob');assert(ctx.recoverPersistence({}));assert(ent
 reset();ctx.recovering=true;ctx.backup='valid-backup';fail='restore';assert(!ctx.recoverPersistence({}));assert(ctx.persistencePaused);assert(!events.includes('clear_backup'));assert.equal(ctx.backup,'valid-backup');
 reset();ctx.recovering=true;assert(ctx.recoverPersistence({}));assert(events.indexOf('restore')<events.indexOf('clear_backup'));assert(!ctx.recovering);
 assert(source.includes('if(persistencePaused||now<retry)return;'));
-const maint=fs.readFileSync(base+'TarsMaintenance.cpp','utf8');assert(maint.includes('if(!sessionPassword.length())'));assert(maint.includes('if(web.uri()=="/")web.requestAuthentication'));assert(maint.includes('if(persistenceFault()){if(!maintenanceActive())open(600,true);'));assert(maint.includes('if(!auth(true))return;String e;bool ok='));
+const maint=fs.readFileSync(base+'TarsMaintenance.cpp','utf8');assert(maint.includes('if(!sessionPassword.length())'));assert(maint.includes('web.challenge();'));assert(maint.includes('if(persistenceFault()){if(!maintenanceActive())open(600,true);'));assert(maint.includes('if(!auth(true))return;String e;bool ok='));
 const control=fs.readFileSync(base+'TarsControl.cpp','utf8');assert(control.includes('d["sequence"]=last'));assert(control.includes('d["ca"]=ack.length()?ackCa:""'));assert(control.includes('if(persistenceFault())return;'));
 const page=fs.readFileSync(base+'TarsPage.h','utf8');assert(page.includes('clearInterval(healthTimer)'));assert(page.includes('d.persistence?.paused'));
 assert(!/nvs_flash_erase|nvs_erase_all|SPIFFS.format|\.clear\(\)/.test(source));

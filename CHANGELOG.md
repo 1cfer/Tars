@@ -1,3 +1,7 @@
+## 4.1.8 — autenticación del panel
+
+Restaura desafíos Digest en recursos auxiliares y mantiene nonce/opaque por sesión para evitar invalidación entre peticiones. Conserva CSRF, contraseña e interfaz. Sin cambios de pines o drivers. Pruebas host; navegador y PCB físicos pendientes.
+
 ## 4.1.7 — recuperación NVS
 
 Pausa escrituras fallidas, conserva AP y sesión durante recuperación y publica ocupación NVS por namespace. Recuperación manual autenticada elimina únicamente copias legadas con blob válido. Conserva diarios/secuencias y reduce el diario de control después de confirmar entrega. No cambia particiones. Pruebas simuladas; validar en un equipo físico antes de desplegar.

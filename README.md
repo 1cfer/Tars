@@ -1,3 +1,5 @@
+> 4.1.8 corrige la autenticación del panel y la carga de campos WiFi. [Instalación y diagnóstico PCB 1.5](docs/guides/PANEL_Y_PCB_4.1.8.md). Prueba física pendiente.
+
 > Recuperación NVS 4.1.7: [procedimiento y límites](docs/guides/RECUPERACION_NVS_4.1.7.md). La validación física sigue pendiente.
 
 <div align="center">
@@ -5,7 +7,7 @@
 # TARS
 ### Monitoreo ambiental con ESP32 · FIWARE · mantenimiento sin cables
 
-![Firmware](https://img.shields.io/badge/firmware-4.1.7-0f766e)
+![Firmware](https://img.shields.io/badge/firmware-4.1.8-0f766e)
 ![ESP32](https://img.shields.io/badge/ESP32-WROOM--DA-2563eb)
 ![Arduino](https://img.shields.io/badge/Arduino_ESP32-3.3.12-00979d)
 ![Contrato](https://img.shields.io/badge/telemetría-NGSIv2-7c3aed)

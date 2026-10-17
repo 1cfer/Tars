@@ -35,7 +35,7 @@ void setup(){
  bootAt=Tars::nowUs();started=true;
  // Primera configuracion vacia: AP inicial; equipos configurados conservan mantenimiento temporal.
  if(Tars::snapshot().id=="new"&&!Tars::snapshot().ssid.length())Tars::requestRecovery(600);
- Serial.println("[TARS] 4.1.7 | WIFI + Enter | Boton 4s/10s");
+ Serial.println("[TARS] 4.1.8 | WIFI + Enter | Boton 4s/10s");
 }
 void loop(){if(!started){delay(100);return;}
  serialDiagnostics();Tars::maintenanceLoop();Tars::configTick();static Tars::Config c=Tars::snapshot();if(c.version!=Tars::configVersion()){c=Tars::snapshot();configTime(0,0,c.ntpServer.c_str(),c.ntpFallback.c_str());}
