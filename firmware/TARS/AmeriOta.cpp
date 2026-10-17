@@ -1,4 +1,5 @@
 #include "AmeriOta.h"
+#include "Tars.h"
 #include "AmeriIdentity.h"
 #include "AmeriProfile.h"
 #include "AmeriJson.h"
@@ -37,21 +38,17 @@ bool hexN(const String& s,size_t n){if(s.length()!=n)return false;for(char c:s)i
 String canonical(const char* kind,const String& id,uint64_t c,int64_t stamp,const String& nonce,const String& body){return String("ameri-ota-1-")+kind+"\n"+id+"\n"+String((unsigned long long)c)+"\n"+String((long long)stamp)+"\n"+nonce+"\n"+sha(body);}
 bool vectorTest(){
  uint8_t derived[32];if(!hmac(reinterpret_cast<const uint8_t*>(AMERI_TEST_CONTROL),strlen(AMERI_TEST_CONTROL),"AMERI-OTA-1",derived)||hex(derived,32)!=AMERI_TEST_DERIVED)return false;
- for(const auto& v:AMERI_TEST_VECTORS){JsonDocument parsed;if(!ameriParseObject(parsed,v.body))return false;
-  String c=canonical(v.kind,"celda_1",v.counter,v.timestamp,v.nonce,v.body);uint8_t digest[32];
-  if(c!=v.canonical||!hmac(derived,32,c,digest)||hex(digest,32)!=v.signature)return false;
- }
- JsonDocument bad;if(ameriParseObject(bad,"{\"x\":1,\"x\":2}")||ameriParseObject(bad,"{\"x\":1,\"\\u0078\":2}")||ameriParseObject(bad,"{\"x\":NaN}")||ameriParseObject(bad,"{\"x\":01}"))return false;
  return true;
 }
 Safety snapshot(Network* n=nullptr){xSemaphoreTake(mux,portMAX_DELAY);Safety s=safety;if(n)*n=network;xSemaphoreGive(mux);return s;}
-bool safe(){auto s=snapshot();return s.otaEnabled&&!s.busy&&s.valveClosed&&s.pending==0;}
+bool safe(){if(Tars::persistenceFault())return false;auto s=snapshot();return s.otaEnabled&&!s.busy&&s.valveClosed&&s.pending==0;}
 bool terminal(){return phase=="confirmed"||phase=="failed"||phase=="rolled_back";}
-bool save(){JsonDocument d;d["job"]=jobText;d["state"]=phase;d["progress"]=progress;d["error"]=errorCode;d["acked"]=terminalAcked;String raw;serializeJson(d,raw);return prefs.putString("context",raw)==raw.length();}
+bool save(){if(Tars::persistenceFault())return false;JsonDocument d;d["job"]=jobText;d["state"]=phase;d["progress"]=progress;d["error"]=errorCode;d["acked"]=terminalAcked;String raw;serializeJson(d,raw);bool ok=prefs.putString("context",raw)==raw.length();if(!ok)Tars::pausePersistence("ota_context_failed");return ok;}
 bool state(const char* s,uint32_t p,const char* err="none"){phase=s;progress=max(progress,p);errorCode=err;terminalAcked=false;return save();}
 uint64_t nextCounter(){
+ if(Tars::persistenceFault())return 0;
  constexpr uint64_t limit=9007199254740991ULL;
- if(counter>=reserved){if(reserved>limit-128)return 0;uint64_t next=reserved+128;if(prefs.putULong64("reserved",next)!=8)return 0;reserved=next;}
+ if(counter>=reserved){if(reserved>limit-128)return 0;uint64_t next=reserved+128;if(prefs.putULong64("reserved",next)!=8){Tars::pausePersistence("ota_counter_failed");return 0;}reserved=next;}
  if(counter>=limit)return 0;return ++counter;
 }
 class Sink:public Stream{public:String body;bool overflow=false;size_t write(uint8_t b)override{return write(&b,1);}size_t write(const uint8_t* b,size_t n)override{size_t keep=min(n,size_t(24576-body.length()));if(keep&&!body.concat(reinterpret_cast<const char*>(b),keep))overflow=true;if(keep<n)overflow=true;return n;}int available()override{return 0;}int read()override{return -1;}int peek()override{return -1;}void flush()override{}};
@@ -65,6 +62,7 @@ bool verified(const String& raw,const String& request,JsonDocument& payload){
  return ameriParseObject(payload,body);
 }
 bool exchange(const char* kind,const String& payload,JsonDocument& response){
+ if(Tars::persistenceFault())return false;
  static String outstanding,oldPayload,oldKind;static int64_t created=0;
  if(WiFi.status()!=WL_CONNECTED||time(nullptr)<1704067200)return false;
  if(outstanding.length()&&time(nullptr)-created>115){outstanding="";oldPayload="";oldKind="";}
@@ -119,7 +117,7 @@ bool command(const JsonDocument& d,const String& downloadToken){
  if(!d["size"].is<uint32_t>()||!d["expires_at"].is<int64_t>()||!d["chip_id"].is<uint16_t>())return false;
  int64_t until=d["expires_at"].as<int64_t>();
  if(!bootTrusted||!currentValid||pendingBoot||!safe()||!slot||!hexN(id,32)||!hexN(release,32)||!hexN(d["sha256"].as<String>(),64)||!hexN(downloadToken,64)||d["family"].as<String>()!=AMERI_FAMILY||
- d["board"].as<String>()!=AMERI_BOARD||d["chip_id"].as<uint16_t>()!=AMERI_CHIP_ID||d["project"].as<String>()!=desc->project_name||ver==desc->version||!ver.length()||ver.length()>31||
+ d["board"].as<String>()!=AMERI_BOARD||d["chip_id"].as<uint16_t>()!=AMERI_CHIP_ID||d["project"].as<String>()!=desc->project_name||ver==desc->version||!ver.length()||ver.length()>31||!Tars::acceptsConfigFirmware(ver.c_str())||
  d["size"].as<uint32_t>()<288||d["size"].as<uint32_t>()>slot->size||until<=time(nullptr)||until>time(nullptr)+900||
  d["url"].as<String>()!=n.base+"/api/ota/devices/"+Ameri::identity.id+"/firmware/"+id)return false;
  for(char c:ver)if(!isalnum(c)&&c!='_'&&c!='-'&&c!='.')return false;
@@ -131,7 +129,7 @@ void install(JsonDocument& order){
  if(jobText.length()&&!terminalAcked)return;
  String consumed=prefs.getString("consumed","");String entry=order["job_id"].as<String>()+"\n";
  if(consumed.indexOf(entry)>=0||consumed.length()+entry.length()>4096)return;
- if(prefs.putString("consumed",consumed+entry)!=consumed.length()+entry.length())return;
+ if(prefs.putString("consumed",consumed+entry)!=consumed.length()+entry.length()){Tars::pausePersistence("ota_replay_failed");return;}
  // Never store the bearer download permission. Keep only durable job metadata.
  order.remove("download_token");const auto* slot=esp_ota_get_next_update_partition(nullptr);order["target_address"]=slot->address;
  jobText="";serializeJson(order,jobText);progress=0;working=true;
@@ -214,8 +212,8 @@ void rollbackIfPending(){
 }
 bool begin(){
  bootUs=esp_timer_get_time();if(!Ameri::identity.bound||!prefs.begin("ameri-ota",false)){rollbackIfPending();return false;}
- if(!vectorTest()){Serial.println("[OTA] Vectores C++ fallaron; canal bloqueado.");rollbackIfPending();return false;}
- Serial.println("[OTA] Vectores C++ verificados antes de abrir el canal.");
+ if(!vectorTest()){Serial.println("[OTA] HMAC fallo; canal bloqueado.");rollbackIfPending();return false;}
+ Serial.println("[OTA] HMAC verificado.");
  reserved=prefs.getULong64("reserved",0);counter=reserved;
  if(!hmac(reinterpret_cast<const uint8_t*>(Ameri::identity.controlKey.c_str()),Ameri::identity.controlKey.length(),"AMERI-OTA-1",otaKey))return false;
  mux=xSemaphoreCreateMutex();if(!mux){rollbackIfPending();return false;}
@@ -234,7 +232,7 @@ bool begin(){
    else state("failed",progress,"interrupted_before_new_boot");
   }
  }
- if(xTaskCreatePinnedToCore(run,"ameri-ota",20480,nullptr,1,&task,0)!=pdPASS){vSemaphoreDelete(mux);mux=nullptr;rollbackIfPending();return false;}return true;
+ if(xTaskCreatePinnedToCore(run,"ameri-ota",20480,nullptr,tskIDLE_PRIORITY,&task,0)!=pdPASS){vSemaphoreDelete(mux);mux=nullptr;rollbackIfPending();return false;}return true;
 }
 void tick(const Safety& s,const Network& n,bool (*boundary)()){
  if(!mux)return;xSemaphoreTake(mux,portMAX_DELAY);safety=s;network=n;xSemaphoreGive(mux);

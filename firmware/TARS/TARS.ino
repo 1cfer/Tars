@@ -6,10 +6,14 @@
 #include <esp_timer.h>
 #include <time.h>
 SET_LOOP_TASK_STACK_SIZE(16384);
+// TLS puede ejecutar criptografia sin bloquearse. Compartir prioridad con IDLE0
+// permite que el tick le ceda CPU incluso dentro de una llamada de mbedTLS.
+static_assert(configUSE_PREEMPTION && configUSE_TIME_SLICING, "TLS requires preemptive time slicing");
 String serialCommand;
 void serialDiagnostics(){
  while(Serial.available()){char ch=Serial.read();if(ch=='\r'||ch=='\n'){
-  serialCommand.trim();if(serialCommand.equalsIgnoreCase("WIFI")){
+  serialCommand.trim();
+ if(serialCommand.equalsIgnoreCase("WIFI")){
    auto c=Tars::snapshot();String id=c.id=="new"?"NEW-"+WiFi.macAddress().substring(9):c.id;id.replace(":","");
    Serial.printf("[MANTENIMIENTO] Usuario admin; clave: %s\n",c.apPassword.c_str());
    if(WiFi.status()==WL_CONNECTED)Serial.printf("Pagina en la red actual: http://%s\n",WiFi.localIP().toString().c_str());
@@ -23,20 +27,19 @@ void setup(){
  Serial.begin(115200);Tars::mutex=xSemaphoreCreateRecursiveMutex();
  if(!Tars::mutex){AmeriOta::rollbackIfPending();return;}
  WiFi.mode(WIFI_STA);WiFi.persistent(false);WiFi.setSleep(true);
- if(!Tars::loadConfig()){Serial.println("[TARS] Configuracion invalida; no se borra ni sustituye.");AmeriOta::rollbackIfPending();return;}
+ if(!Tars::loadConfig()){Serial.println("[TARS] Configuracion invalida; conservada.");AmeriOta::rollbackIfPending();return;}
  Tars::beginPairing();Tars::beginNetwork();Tars::beginSensors();Tars::beginMaintenance();
  configTime(0,0,Tars::config.ntpServer.c_str(),Tars::config.ntpFallback.c_str());
  TaskHandle_t sensors=nullptr,network=nullptr;
- if(xTaskCreatePinnedToCore(Tars::sensorTask,"tars-sensors",8192,nullptr,2,&sensors,1)!=pdPASS||xTaskCreatePinnedToCore(Tars::networkTask,"tars-network",16384,nullptr,1,&network,0)!=pdPASS){Serial.println("[TARS] No se pudieron crear tareas.");AmeriOta::rollbackIfPending();return;}
+ if(xTaskCreatePinnedToCore(Tars::sensorTask,"tars-sensors",8192,nullptr,2,&sensors,1)!=pdPASS||xTaskCreatePinnedToCore(Tars::networkTask,"tars-network",16384,nullptr,tskIDLE_PRIORITY,&network,0)!=pdPASS){Serial.println("[TARS] Error creando tareas.");AmeriOta::rollbackIfPending();return;}
  bootAt=Tars::nowUs();started=true;
  // Primera configuracion vacia: AP inicial; equipos configurados conservan mantenimiento temporal.
  if(Tars::snapshot().id=="new"&&!Tars::snapshot().ssid.length())Tars::requestRecovery(600);
- Serial.println("[TARS] 4.1.1: Escriba WIFI + Enter en serie para abrir mantenimiento y consultar su clave local.");
- Serial.println("[TARS] Arranque; diagnostico sin credenciales. Boton 4s: mantenimiento. Boton 10s: AP de recuperacion 10min.");
+ Serial.println("[TARS] 4.1.7 | WIFI + Enter | Boton 4s/10s");
 }
 void loop(){if(!started){delay(100);return;}
  serialDiagnostics();Tars::maintenanceLoop();Tars::configTick();static Tars::Config c=Tars::snapshot();if(c.version!=Tars::configVersion()){c=Tars::snapshot();configTime(0,0,c.ntpServer.c_str(),c.ntpFallback.c_str());}
- if(Ameri::identity.bound&&!otaStarted&&Tars::nowUs()>=nextOtaAttempt){nextOtaAttempt=Tars::nowUs()+60000000;otaStarted=AmeriOta::begin();}
+ if(Ameri::identity.bound&&!otaStarted&&!Tars::persistenceFault()&&Tars::nowUs()>=nextOtaAttempt){nextOtaAttempt=Tars::nowUs()+60000000;otaStarted=AmeriOta::begin();}
  Tars::Reading r;{Tars::Lock lock;r=Tars::reading;}
  bool sensorOK=r.uptimeUs&&Tars::nowUs()-r.uptimeUs<uint64_t(c.readMs)*2000&&(r.failures&7)!=7;
  if(otaStarted){AmeriOta::Safety s(Tars::maintenanceActive()||Tars::localUpload||Tars::configProbation(),true,Tars::storageReady&&sensorOK,Tars::pendingCount());s.otaEnabled=c.otaEnabled;AmeriOta::Network n;n.base=Tars::otaBase(c);n.ca=c.ca;AmeriOta::tick(s,n,Tars::persistBoundary);}
@@ -46,6 +49,6 @@ void loop(){if(!started){delay(100);return;}
    else if(Tars::nowUs()-bootAt>90000000)AmeriOta::rollbackIfPending();
   }
  }
- static uint64_t lastLog=0;if(Tars::nowUs()-lastLog>=10000000){lastLog=Tars::nowUs();Serial.printf("[ESTADO] uptime=%lus muestra=%lluus fallos=0x%X wifi=%s AP=%s RAM=%u\n",millis()/1000,(unsigned long long)r.uptimeUs,r.failures,WiFi.status()==WL_CONNECTED?"OK":"DESCONECTADO",((WiFi.getMode() & WIFI_AP)!=0)?"ON":"OFF",ESP.getFreeHeap());}
+ static uint64_t nextLog=10000000;uint64_t logNow=Tars::nowUs();if(logNow>=nextLog){nextLog=logNow+10000000;Serial.printf("[ESTADO] uptime=%lus muestra=%lluus fallos=0x%X wifi=%s AP=%s RAM=%u\n",(unsigned long)(logNow/1000000),(unsigned long long)r.uptimeUs,r.failures,WiFi.status()==WL_CONNECTED?"OK":"DESCONECTADO",((WiFi.getMode() & WIFI_AP)!=0)?"ON":"OFF",ESP.getFreeHeap());}
  delay(50);
 }

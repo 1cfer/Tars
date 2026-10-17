@@ -5,10 +5,14 @@
 #include <Preferences.h>
 #include <WiFi.h>
 #include <time.h>
+#include <nvs.h>
+#include <esp_err.h>
+#include <esp_ota_ops.h>
 namespace Tars {
 Config config;Reading reading;Delivery delivery[DESTINATIONS];SemaphoreHandle_t mutex=nullptr;
 namespace {
-Preferences prefs;String backup;uint64_t probationAt=0;bool controlOk=false,telemetryOk=false;
+struct ConfigStore:Preferences{nvs_handle_t handle(){return _handle;}};
+ConfigStore prefs;String backup;uint64_t probationAt=0;bool controlOk=false,telemetryOk=false,recovering=false;
 bool idOK(const String&s){if(!s.length()||s.length()>24)return false;for(char c:s)if(!((c>='a'&&c<='z')||(c>='0'&&c<='9')||c=='_'||c=='-'))return false;return true;}
 bool keyOK(const String&s){if(s.length()!=64)return false;for(char c:s)if(!((c>='0'&&c<='9')||(c>='a'&&c<='f')))return false;return true;}
 void encode(JsonDocument&d,const Config&c,bool secret){
@@ -17,10 +21,10 @@ void encode(JsonDocument&d,const Config&c,bool secret){
  d["control_url"]=c.controlUrl;d["ntp_server"]=c.ntpServer;d["ntp_fallback"]=c.ntpFallback;d["temperature_offset"]=c.tempOffset;d["humidity_offset"]=c.humOffset;d["lux_offset"]=c.luxOffset;d["lux_slope"]=c.luxSlope;
  d["noise_slope"]=c.noiseSlope;d["noise_offset"]=c.noiseOffset;d["noise_verified"]=c.noiseVerified;
  if(secret){d["wifi_password"]=c.password;d["control_key"]=c.controlKey;d["ap_password"]=c.apPassword;d["ca_pem"]=c.ca;}
- d["wifi_password_set"]=c.password.length()>0;d["control_key_set"]=c.controlKey.length()>0;
+ if(!secret){d["wifi_password_set"]=c.password.length()>0;d["control_key_set"]=c.controlKey.length()>0;}
  JsonArray a=d["destinations"].to<JsonArray>();
  for(unsigned i=0;i<DESTINATIONS;++i){const auto&x=c.destinations[i];JsonObject o=a.add<JsonObject>();o["slot"]=i;o["enabled"]=x.enabled;o["url"]=x.url;o["method"]=x.method;o["auth"]=x.auth;o["fiware_service"]=x.service;o["fiware_servicepath"]=x.path;o["token_url"]=x.tokenUrl;o["client_id"]=x.clientId;
-  o["bearer_set"]=x.bearer.length()>0;o["oauth_user_set"]=x.user.length()>0;o["oauth_password_set"]=x.password.length()>0;o["client_secret_set"]=x.clientSecret.length()>0;
+  if(!secret){o["bearer_set"]=x.bearer.length()>0;o["oauth_user_set"]=x.user.length()>0;o["oauth_password_set"]=x.password.length()>0;o["client_secret_set"]=x.clientSecret.length()>0;}
   if(secret){o["bearer"]=x.bearer;o["oauth_user"]=x.user;o["oauth_password"]=x.password;o["client_secret"]=x.clientSecret;o["ca_pem"]=x.ca;}
  }
 }
@@ -52,28 +56,66 @@ bool decode(JsonObjectConst d,Config&c,String&error,bool stored=false){
  }
  for(const String&s:{c.ntpServer,c.ntpFallback}){if(!s.length()||s.length()>253)error="Servidor NTP invalido";for(char ch:s)if(!((ch>='a'&&ch<='z')||(ch>='A'&&ch<='Z')||(ch>='0'&&ch<='9')||ch=='.'||ch=='-'))error="Servidor NTP invalido";}
  if(!idOK(c.id)||c.ssid.length()>32||c.password.length()>63||(c.password.length()&&c.password.length()<8)||c.apPassword.length()<12||c.apPassword.length()>63)error="Identidad o claves WiFi invalidas";
- if(c.controlKey.length()&&!keyOK(c.controlKey))error="Clave HMAC invalida: requiere 64 hex minusculas";
- if(c.controlUrl.length()&&(!validUrl(c.controlUrl,true)||!keyOK(c.controlKey)||c.id=="new"))error="Control requiere ID definitivo, HTTPS y clave HMAC de 64 hex minusculas";
+ if(c.controlKey.length()&&!keyOK(c.controlKey))error="HMAC: requiere 64 hex minusculas";
+ if(c.controlUrl.length()&&(!validUrl(c.controlUrl,true)||!keyOK(c.controlKey)||c.id=="new"))error="Control: requiere ID, HTTPS y HMAC validos";
  if(c.ca.indexOf("-----BEGIN CERTIFICATE-----")<0||c.ca.length()>5000)error="CA global invalida";
  for(auto&x:c.destinations){
-  if((x.url.length()&&!validUrl(x.url))||(x.enabled&&!x.url.length())||(x.method!="POST"&&x.method!="PATCH")||(x.auth!="none"&&x.auth!="bearer"&&x.auth!="oauth_password")||!validHeader(x.service)||!validHeader(x.path)||!validHeader(x.bearer))error="Destino, metodo o autenticacion invalidos";
+  if((x.url.length()&&!validUrl(x.url))||(x.enabled&&!x.url.length())||(x.method!="POST"&&x.method!="PATCH")||(x.auth!="none"&&x.auth!="bearer"&&x.auth!="oauth_password")||!validHeader(x.service)||!validHeader(x.path)||!validHeader(x.bearer))error="Destino o autenticacion invalidos";
   if(x.auth=="bearer"&&!x.bearer.length())error="Falta Bearer del destino";
-  if(x.auth=="oauth_password"&&(!validUrl(x.tokenUrl)||!x.user.length()||!x.password.length()||!x.clientId.length()||!x.clientSecret.length()))error="Faltan credenciales Keyrock";
+  if(x.auth=="oauth_password"&&(!validUrl(x.tokenUrl)||!x.user.length()||!x.password.length()||!x.clientId.length()||!x.clientSecret.length()))error="Keyrock incompleto";
   if(x.ca.length()&&(x.ca.indexOf("-----BEGIN CERTIFICATE-----")<0||x.ca.length()>5000))error="CA del destino invalida";
   if(x.user.length()>256||x.password.length()>256||x.clientId.length()>256||x.clientSecret.length()>256||x.service.length()>64||x.path.length()>128)error="Campo demasiado largo";
  }
  return !error.length();
 }
 void syncIdentity(){if(Ameri::identity.bound)return;Ameri::identity.id=config.id;Ameri::identity.controlKey=config.controlKey;Ameri::identity.bound=config.id!="new"&&config.controlUrl.length()&&keyOK(config.controlKey);}
-bool write(const Config&c){String s=configJson(c,true);return s.length()<=14000&&prefs.putString("config",s)==s.length();}
+const char*configFailure="config_write_failed";
+bool persistencePaused=false;
+bool writeReady(){
+ esp_ota_img_states_t state;
+ if(esp_ota_get_state_partition(esp_ota_get_running_partition(),&state)==ESP_OK&&state==ESP_OTA_IMG_PENDING_VERIFY){configFailure="wait_boot_validation";return false;}
+ return true;
+}
+bool blobPresent(const char*key){size_t n=0;return nvs_get_blob(prefs.handle(),key,nullptr,&n)!=ESP_ERR_NVS_NOT_FOUND;}
+bool readRecord(const char*key,const char*legacy,String&out){
+ size_t n=0;esp_err_t error=nvs_get_blob(prefs.handle(),key,nullptr,&n);bool blob=error!=ESP_ERR_NVS_NOT_FOUND;
+ if(!blob){
+  if(!legacy||!legacy[0])return false;
+  error=nvs_get_str(prefs.handle(),legacy,nullptr,&n);
+  if(error==ESP_ERR_NVS_NOT_FOUND){out="";return true;}
+ }
+ if(error!=ESP_OK||n<2||n>14001)return false;
+ char*data=static_cast<char*>(malloc(n+1));if(!data)return false;
+ error=blob?nvs_get_blob(prefs.handle(),key,data,&n):nvs_get_str(prefs.handle(),legacy,data,&n);
+ size_t length=blob?n:n-1;bool valid=error==ESP_OK&&length<=14000&&memchr(data,0,length)==nullptr;
+ if(valid)out=String(data,length);free(data);return valid&&out.length()==length;
+}
+bool writeRecord(const char*key,const String&s){
+ if(persistencePaused||!writeReady())return false;
+ if(s.length()<2||s.length()>14000){configFailure="config_size_failed";return false;}
+ const char*stage="write_blob";esp_err_t error=nvs_set_blob(prefs.handle(),key,s.c_str(),s.length());
+ if(error==ESP_OK){stage="commit";error=nvs_commit(prefs.handle());}
+ if(error!=ESP_OK){nvs_stats_t stats={};esp_err_t status=nvs_get_stats(nullptr,&stats);Serial.printf("[CONFIG] key=%s stage=%s error=%s bytes=%u free_entries=%u stats_ok=%u\n",key,stage,esp_err_to_name(error),unsigned(s.length()),unsigned(stats.free_entries),status==ESP_OK);configFailure=esp_err_to_name(error);persistencePaused=true;return false;}
+ String stored;if(!readRecord(key,"",stored)||stored!=s){Serial.println("[CONFIG] blob_readback_failed");configFailure="config_readback_failed";persistencePaused=true;return false;}
+ Serial.printf("[CONFIG] verified key=%s bytes=%u\n",key,unsigned(s.length()));return true;
+}
+bool write(const Config&c){return writeRecord("cfg_blob",configJson(c,true));}
+bool clearBackup(){
+ for(const char*key:{"backup","backup_blob"}){
+  esp_err_t error=nvs_erase_key(prefs.handle(),key);
+  if(error!=ESP_OK&&error!=ESP_ERR_NVS_NOT_FOUND){persistencePaused=true;configFailure="backup_cleanup_failed";return false;}
+  if(nvs_commit(prefs.handle())!=ESP_OK){persistencePaused=true;configFailure="backup_cleanup_failed";return false;}
+ }return true;
+}
+
 }
 Config snapshot(){Lock lock;return config;}
 uint32_t configVersion(){Lock lock;return config.version;}
 String configJson(const Config&c,bool secret){JsonDocument d;encode(d,c,secret);String s;serializeJson(d,s);return s;}
 bool loadConfig(){
  if(!prefs.begin("tars4-config",false))return false;config.ca=Certificates::ROOT_CA;
- String stored=prefs.getString("config",""),old=prefs.getString("backup","");
- if(old.length()){stored=old;if(prefs.putString("config",old)!=old.length())return false;prefs.remove("backup");}
+ String stored,old;if(!readRecord("backup_blob","backup",old))return false;
+ if(old.length()){stored=old;backup=old;recovering=true;persistencePaused=true;configFailure="recovery_required";}else if(!readRecord("cfg_blob","config",stored))return false;
  if(stored.length()){JsonDocument d;String error;if(!ameriParseObject(d,stored)||!decode(d.as<JsonObjectConst>(),config,error,true))return false;config.version=d["config_version"]|1U;}
  else {
   config.apPassword="tars12345678";
@@ -90,31 +132,34 @@ bool loadConfig(){
   if(!write(config))return false;
  }
  // No restablecer claves durante OTA: configuraciones existentes conservan su AP privado.
- if(!prefs.getBool("ap-standard-v2",false)&&!prefs.putBool("ap-standard-v2",true))return false;
+ if(!prefs.getBool("ap-standard-v2",false)&&!prefs.putBool("ap-standard-v2",true))pausePersistence("config_marker_failed");
  syncIdentity();return true;
 }
 bool applyConfig(const String&json,String&error){
  Lock lock;JsonDocument d;if(!ameriParseObject(d,json)||json.length()>14000){error="JSON invalido";return false;}
  if(!d["expected_config_version"].is<uint32_t>()||d["expected_config_version"].as<uint32_t>()!=config.version){error="version_conflict";return false;}
- if(probationAt){error="network_probation";return false;}
- Config next=config;if(!decode(d.as<JsonObjectConst>(),next,error))return false;if(configJson(next,false).length()>5000){error="Configuracion publica demasiado grande";return false;}
- if(config.id!="new"&&next.id!=config.id){error="ID ya vinculado; no se renombra por OTA";return false;}
- if(next.controlKey!=config.controlKey&&config.controlKey.length()){error="HMAC ya vinculada; no se cambia remotamente";return false;}
- for(unsigned i=0;i<DESTINATIONS;++i)if(delivery[i].pending&&next.destinations[i].url!=config.destinations[i].url){bool reroute=false;for(JsonObjectConst o:d["destinations"].as<JsonArrayConst>())if(o["slot"].as<unsigned>()==i&&o["reroute_pending"].is<bool>())reroute=o["reroute_pending"].as<bool>();if(!reroute){error="pending_destination_records: autorice reroute_pending para enviar pendientes a la nueva URL";return false;}}
+ if(probationAt||recovering){error="network_probation";return false;}
+ if(!writeReady()){error=configFailure;return false;}
+ if(persistencePaused){error=configFailure;return false;}
+ Config next=config;if(!decode(d.as<JsonObjectConst>(),next,error))return false;if(configJson(next,false).length()>5000){error="Configuracion publica excedida";return false;}
+ if(config.id!="new"&&next.id!=config.id){error="ID ya vinculado";return false;}
+ if(next.controlKey!=config.controlKey&&config.controlKey.length()){error="HMAC ya vinculada";return false;}
+ for(unsigned i=0;i<DESTINATIONS;++i)if(delivery[i].pending&&next.destinations[i].url!=config.destinations[i].url){bool reroute=false;for(JsonObjectConst o:d["destinations"].as<JsonArrayConst>())if(o["slot"].as<unsigned>()==i&&o["reroute_pending"].is<bool>())reroute=o["reroute_pending"].as<bool>();if(!reroute){error="pending_destination_records: falta reroute_pending";return false;}}
  bool network=next.ssid!=config.ssid||next.password!=config.password||next.controlUrl!=config.controlUrl||next.ca!=config.ca;
  if(config.version==UINT32_MAX){error="version_exhausted";return false;}next.version=config.version+1;
  Config restored=config; // Una prueba de red no deshace la primera vinculacion de identidad.
  if(restored.id=="new"&&next.id!="new")restored.id=next.id;
  if(!restored.controlKey.length()&&next.controlKey.length())restored.controlKey=next.controlKey;
  String old=configJson(restored,true);
- if(network&&(prefs.putString("backup",old)!=old.length())){error="backup_failed";return false;}
- if(!write(next)){if(network)prefs.remove("backup");error="storage_failed";return false;}
+ if(network&&!writeRecord("backup_blob",old)){error="backup_failed";return false;}
+ if(!write(next)){if(network){backup=old;recovering=true;}error=configFailure;return false;}
  config=next;syncIdentity();
  if(network){backup=old;probationAt=nowUs()+180000000;controlOk=!config.controlUrl.length();telemetryOk=false;bool enabled=false;for(auto&x:config.destinations)enabled|=x.enabled;if(!enabled)telemetryOk=true;}
  return true;
 }
 bool commitPairing(const String&payload,bool history,String&error){
- Lock lock;if(probationAt){error="network_probation";return false;}
+ Lock lock;if(persistencePaused){error=configFailure;return false;}if(probationAt||recovering){error="network_probation";return false;}
+ if(!writeReady()){error=configFailure;return false;}
  if(config.controlKey.length()){error="already_bound";return false;}
  JsonDocument p;if(!ameriParseObject(p,payload)){error="invalid_payload";return false;}
  Config next=config;String id=p["device_id"].as<String>();
@@ -136,10 +181,52 @@ bool commitPairing(const String&payload,bool history,String&error){
  JsonDocument validated;encode(validated,next,true);if(!decode(validated.as<JsonObjectConst>(),next,error,true))return false;
  // Preparar sidecar antes del único commit: solo es efectivo si coincide con la configuración confirmada.
  if(!storeOtaBinding(next,p["ota_base_url"].as<String>(),error))return false;
- if(!write(next)||prefs.getString("config","")!=configJson(next,true)){error="storage_failed";return false;}
+ if(!write(next)){error=configFailure;return false;}
  config=next;syncIdentity();error=note;return true;
 }
-bool configProbation(){Lock lock;return probationAt!=0;}
-void networkSuccess(bool control,unsigned slot,uint32_t version){Lock lock;if(!probationAt||version!=config.version)return;unsigned primary=0;while(primary<DESTINATIONS&&!config.destinations[primary].enabled)++primary;if(control)controlOk=true;else if(slot==primary)telemetryOk=true;if(controlOk&&telemetryOk){prefs.remove("backup");backup="";probationAt=0;}}
-void configTick(){Lock lock;if(probationAt&&controlOk&&telemetryOk&&(!config.ssid.length()||WiFi.status()==WL_CONNECTED)){prefs.remove("backup");backup="";probationAt=0;}if(probationAt&&nowUs()>=probationAt){JsonDocument d;Config old;String e;if(ameriParseObject(d,backup)&&decode(d.as<JsonObjectConst>(),old,e,true)){old.version=d["config_version"]|1U;if(write(old)){config=old;syncIdentity();prefs.remove("backup");backup="";probationAt=0;}}}}
+bool acceptsConfigFirmware(const char*version){
+ Lock lock;if(!blobPresent("cfg_blob"))return true;
+ if(!version||strnlen(version,32)>=32)return false;
+ unsigned part[3]={};const char*p=version;
+ for(unsigned i=0;i<3;++i){if(*p<'0'||*p>'9')return false;
+  do{part[i]=part[i]*10+unsigned(*p++-'0');if(part[i]>9999)return false;}while(*p>='0'&&*p<='9');
+  if(i<2){if(*p++!='.')return false;}else if(*p)return false;
+ }
+ return part[0]>4||(part[0]==4&&(part[1]>1||(part[1]==1&&part[2]>=6)));
+}
+void pausePersistence(const char*reason){Lock lock;persistencePaused=true;configFailure=reason;}
+bool persistenceFault(){Lock lock;return persistencePaused;}
+String persistenceStatus(){Lock lock;JsonDocument d;nvs_stats_t stats={};if(nvs_get_stats(nullptr,&stats)==ESP_OK){d["free_entries"]=stats.free_entries;d["used_entries"]=stats.used_entries;d["total_entries"]=stats.total_entries;}auto records=d["records"].to<JsonObject>();
+ for(const char*space:{"tars4-config","tars4-control","tars-pair-v1","ameri-ota","tars4-outbox"}){nvs_handle_t h;if(nvs_open(space,NVS_READONLY,&h)!=ESP_OK)continue;size_t used=0;if(nvs_get_used_entry_count(h,&used)==ESP_OK)records[space]=used;nvs_close(h);}
+ d["paused"]=persistencePaused;d["error"]=persistencePaused?configFailure:"";String out;serializeJson(d,out);return out;}
+bool recoverPersistence(String&error){
+ Lock lock;if(!writeReady()){error=configFailure;return false;}
+ // Only retire legacy keys after validating their authoritative blob. Never erase the blob.
+ for(const char*key:{"cfg_blob","backup_blob"}){
+  if(!blobPresent(key))continue;String raw;JsonDocument d;Config checked;checked.ca=Certificates::ROOT_CA;String why;
+  if(!readRecord(key,"",raw)||!ameriParseObject(d,raw)||!decode(d.as<JsonObjectConst>(),checked,why,true)){pausePersistence("recovery_validation_failed");error=configFailure;return false;}
+  const char*legacy=strcmp(key,"cfg_blob")==0?"config":"backup";
+  esp_err_t e=nvs_erase_key(prefs.handle(),legacy);if((e!=ESP_OK&&e!=ESP_ERR_NVS_NOT_FOUND)||nvs_commit(prefs.handle())!=ESP_OK){pausePersistence("recovery_cleanup_failed");error=configFailure;return false;}
+ }
+ persistencePaused=false;
+ // Restore the already selected valid configuration before dropping its active backup.
+ if(recovering){if(!write(config)||!clearBackup()){persistencePaused=true;error=configFailure;return false;}recovering=false;backup="";probationAt=0;}
+ return true;
+}
+bool configProbation(){Lock lock;return probationAt!=0||recovering;}
+void networkSuccess(bool control,unsigned slot,uint32_t version){Lock lock;if(persistencePaused||!probationAt||version!=config.version)return;unsigned primary=0;while(primary<DESTINATIONS&&!config.destinations[primary].enabled)++primary;if(control)controlOk=true;else if(slot==primary)telemetryOk=true;if(controlOk&&telemetryOk){if(clearBackup()){backup="";probationAt=0;}}}
+void configTick(){
+ Lock lock;static uint64_t retry=0;uint64_t now=nowUs();if(persistencePaused||now<retry)return;
+ if(recovering){retry=now+5000000;if(writeReady()&&write(config)&&clearBackup()){backup="";recovering=false;probationAt=0;}return;}
+ if(probationAt&&controlOk&&telemetryOk&&(!config.ssid.length()||WiFi.status()==WL_CONNECTED)){
+  retry=now+5000000;if(clearBackup()){backup="";probationAt=0;}return;
+ }
+ if(probationAt&&now>=probationAt){
+  retry=now+5000000;JsonDocument d;Config old;String error;
+  if(ameriParseObject(d,backup)&&decode(d.as<JsonObjectConst>(),old,error,true)){
+   old.version=d["config_version"]|1U;
+   config=old;syncIdentity();recovering=true;if(write(old)&&clearBackup()){backup="";probationAt=0;recovering=false;}
+  }
+ }
+}
 }

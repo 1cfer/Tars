@@ -1,9 +1,11 @@
+> Recuperación NVS 4.1.7: [procedimiento y límites](docs/guides/RECUPERACION_NVS_4.1.7.md). La validación física sigue pendiente.
+
 <div align="center">
 
 # TARS
 ### Monitoreo ambiental con ESP32 · FIWARE · mantenimiento sin cables
 
-![Firmware](https://img.shields.io/badge/firmware-4.1.1-0f766e)
+![Firmware](https://img.shields.io/badge/firmware-4.1.7-0f766e)
 ![ESP32](https://img.shields.io/badge/ESP32-WROOM--DA-2563eb)
 ![Arduino](https://img.shields.io/badge/Arduino_ESP32-3.3.12-00979d)
 ![Contrato](https://img.shields.io/badge/telemetría-NGSIv2-7c3aed)
@@ -16,11 +18,65 @@
 
 </div>
 
+## Recuperación NVS 4.1.7
+
+Detiene reintentos de persistencia fallidos, muestra el error y mantiene el AP durante la recuperación. La limpieza manual solo retira copias legadas cuando ha validado sus blobs sustitutos. Conserva identidad, claves, secuencias y configuración válida. Consulta el [procedimiento de recuperación](docs/guides/RECUPERACION_NVS_4.1.7.md) antes de instalar.
+
+## Almacenamiento por bloques (introducido en 4.1.6)
+
+El equipo devolvió `ESP_ERR_NVS_NOT_ENOUGH_SPACE` al guardar una cadena de 2365 bytes, con 352 entradas libres. Espressif documenta que una cadena necesita entradas contiguas en una misma página y puede fallar por fragmentación aunque haya espacio total. El firmware anterior usaba `nvs_set_str`; 4.1.6 usa `nvs_set_blob` para configuración y copia de prueba de red.
+
+La configuración nueva reside en `cfg_blob` y su copia temporal en `backup_blob`, dentro de `tars4-config`. La cadena antigua `config` se conserva durante la migración; en 4.1.7 la recuperación manual puede retirarla únicamente después de validar `cfg_blob`. Si no existe el blob, se lee esa cadena. Un blob presente pero inválido no se sustituye silenciosamente por valores antiguos. Cada escritura hace commit y lectura exacta antes de aplicar la configuración en RAM. NVS aporta el almacenamiento multipágina y su comprobación de integridad. Las colas, credenciales, calibración y WiFi se conservan.
+
+Si existe una copia de una prueba de red incompleta, se lee primero y se usa en RAM para recuperar la conexión; solo se retira después de guardar y verificar su restauración. 4.1.6 reintentaba la recuperación cada cinco segundos. En 4.1.7 un fallo pausa las siguientes escrituras y requiere recuperación manual. No se borra la partición NVS ni se limpian namespaces completos.
+
+La migración no escribe el nuevo formato mientras la imagen OTA esté pendiente de validación. Una vez utilizado el blob, la OTA local y de servidor rechazan firmware anterior a **4.1.6** o con versión numérica incompatible, porque no sabe leerlo. Las actualizaciones futuras deben conservar el lector de este formato. Instalar firmware antiguo por USB elude esa protección y leería la copia antigua; reinstalar 4.1.6 o posterior recupera el blob, siempre que no se haya borrado la flash.
+
+Mantener CPU a 240 MHz durante la prueba. Instalar sin borrar flash ni cambiar particiones; generar otro código para el mismo ID solo si la solicitud anterior caducó. Éxito esperado: `[CONFIG] verified key=cfg_blob bytes=...`, ID definitivo y contacto firmado reciente. Confirmar persistencia con un reinicio antes de desplegar otra unidad.
+
+Pruebas de código y almacenamiento simulado realizadas; faltan validación NVS, OTA, cortes de alimentación y recepción de datos en el equipo físico. La API pública de configuración y los contratos de red no cambian.
+
+## Guardado de vinculación 4.1.5
+
+En el equipo probado, al configurar CPU a 240 MHz la vinculación recibió HTTP 200 y pasó la validación de su respuesta firmada; el fallo siguiente fue `storage_failed`. Esto localiza el nuevo problema en la escritura/verificación local de configuración. No demuestra todavía si NVS carece de espacio, está fragmentada, rechaza el tamaño o falla la lectura de verificación.
+
+La versión 4.1.5 reduce el JSON privado eliminando únicamente indicadores derivados `*_set`. Conserva todos los ajustes y secretos reales; el JSON público no cambia. Mantiene namespace `tars4-config`, clave `config` y tipo cadena para permitir lectura por versiones anteriores. Las claves antiguas y las colas permanecen intactas. Cada escritura comprueba commit y lectura exacta antes de promover la configuración en RAM. Registra `[CONFIG]` con etapa, error ESP-IDF, tamaño y entradas libres; nunca imprime el JSON ni secretos.
+
+Mantener 240 MHz durante esta comprobación; la actualización conserva el valor configurado. No se modifican certificados ni timeouts. La prueba temporal NETTEST de 4.1.4 se retira para liberar espacio OTA; el comando informa que se completó y remite a CONFIG. No se borra su marcador NVS. Las instrucciones siguientes de NETTEST son históricas y se aplican solo a 4.1.4.
+
+Después de actualizar, si la petición caducó, generar otro código para el mismo ID y vincular. Éxito: `[CONFIG] verified`, ID definitivo y contacto firmado reciente confirmado por el servidor. Si falla, copiar la línea `[CONFIG]` y el estado de vinculación. No borrar flash ni crear otra identidad.
+
+## Prueba única TCP/TLS 4.1.4
+
+Con WiFi y UTC listos, abrir el monitor serie a 115200 y escribir `NETTEST` + Enter **antes del siguiente intento de vinculación**. No es necesario cambiar la petición si sigue vigente. Si caducó, generar otro código en Devices para el mismo ID. El comando arma una sola prueba; al comenzar, el firmware guarda `ran414` en un namespace NVS independiente (`tars-netdiag`). No toca configuración, credenciales, solicitud ni colas. No repite la prueba al reiniciar ni al reenviar NETTEST. Si la escritura del marcador falla, omite la prueba y conserva la vinculación normal.
+
+La prueba abre TCP a la IP resuelta del hostname y al puerto original, mide el resultado y cierra el socket antes de comenzar TLS. TLS usa la misma CA en memoria que el envío real; conserva hostname para SNI y X.509. La conexión TLS probada es la del POST de vinculación: no hay una segunda CA ni otro cliente oculto. Si TLS tiene éxito, HTTPClient envía la solicitud sobre esa misma conexión. Si falla, se captura el resultado crudo inmediatamente antes de limpiar TLS.
+
+`NETTEST-CLIENT same=1 ca=1` comprueba en ejecución que el puntero de cliente de HTTPClient es el cliente configurado y que conserva esa CA con verificación activa. Se registran timeouts efectivos del cliente y HTTPClient, UTC completa, CPU, heap/bloque contiguo antes/después de configurar y conectar, DNS/IP/puerto, y etapas `tcp`, `tls_setup`, `tls_handshake`, `http_result`. Los timeouts permanecen en 5000 ms TCP/HTTP y 8000 ms handshake; los valores previos a configurar pueden mostrar valores iniciales del core. errno es auxiliar y puede tener valores residuales incluso con una operación correcta.
+
+Una conexión TCP de prueba cerrada sin HTTP es intencional. Pedir al servidor correlacionar conexiones, no solo POSTs. No cambiar certificados ni aumentar timeouts sin interpretar las etapas. En fuentes locales, TARS y pluviómetro comparten la misma CA y los mismos límites TLS/TCP; la configuración CA activa de un equipo puede proceder de NVS. TARS sí permite reducir CPU a 80 MHz; la fuente del pluviómetro revisada no la reduce explícitamente. El diagnóstico registra la CPU real, sin cambiarla.
+
+Se comprimió también `/sha.js` para conservar espacio OTA; al descomprimir es idéntico al helper SHA-256 anterior. La interfaz y el cálculo de hash no cambian.
+
+## Diagnóstico 4.1.3 y refresco OLED
+
+Vinculación HTTPS: el monitor serie a 115200 informa `[PAIR-TLS]` con UTC ISO 8601, resultado DNS, IP usada, duración en ms, heap de 8 bits libre y mayor bloque contiguo, código mbedTLS y su descripción, y errno capturado. La captura de fallo ocurre antes de `NetworkClientSecure::stop()`; `[PAIR-HTTP]` informa después el resultado de HTTPClient y la duración total. Un fallo DNS se distingue de un fallo TLS. `tls_error=0` no confirma una conexión: puede no haberse iniciado TLS. errno es una instantánea auxiliar y no sustituye el error mbedTLS.
+
+No se imprime URL, cuerpo de solicitud, código temporal, certificado, contraseña ni token. Se conservan CA, hostname/SNI, límites de tiempo y la solicitud persistida. No se cambian certificados por inferencia. El primer diagnóstico real debe obtenerse del equipo.
+
+El estado serie se programa con un único vencimiento cada 10 segundos, sin ráfagas para recuperar vencimientos atrasados. La OLED conserva una copia de la imagen enviada y actualiza solo columnas modificadas de cada página. Las imágenes idénticas no producen tráfico I²C. Se mantiene 50 kHz y se invalidan las diferencias tras un NACK. El arranque y los cambios de página pueden requerir una imagen completa; no se promete eliminar todo efecto de barrido.
+
+## Corrección 4.1.2: reinicio al vincular
+
+Se recibió un registro real de `Task watchdog`, con `IDLE0` sin ejecutar y `tars-network` ocupando CPU 0 durante la vinculación HTTPS. Las tareas de red y OTA ahora comparten la prioridad de IDLE para que el planificador pueda ejecutar IDLE0 durante operaciones criptográficas largas. El watchdog sigue activo; se conservan los límites de tiempo HTTP/TLS y la configuración de energía. No se modifica el reloj de CPU durante I²C.
+
+La actualización conserva WiFi, identidad, credenciales, calibración, petición de vinculación pendiente y colas. Después de instalarla, comprobar primero un equipo: versión 4.1.2, vinculación sin reinicios y contacto firmado en AMERI. La corrección está compilada y probada con un modelo de planificación; falta confirmar HTTPS y OTA en hardware.
+
 ## Qué hace
 
 TARS mide temperatura, humedad relativa, iluminancia y señal de sonido. Muestra valores en una OLED SSD1306 y envía ventanas de muestras válidas como atributos NGSIv2. Está orientado a prototipos de monitoreo ambiental y comparación de condiciones en espacios interiores.
 
-La versión 4.1.1 usa tareas independientes de lectura y red, hasta cuatro destinos HTTPS, colas persistentes y mantenimiento temporal por botón. Una petición HTTPS no ejecuta la lectura de sensores. El firmware conserva la medición durante mantenimiento.
+La versión 4.1.6 usa tareas independientes de lectura y red, hasta cuatro destinos HTTPS, colas persistentes y mantenimiento temporal por botón. Una petición HTTPS no ejecuta la lectura de sensores. El firmware conserva la medición durante mantenimiento.
 
 **Estado:** compilación para ESP32 3.3.12 y pruebas de lógica verificadas; esta versión necesita validación física en un TARS antes de un despliegue en lote. La comunicación I²C y la lectura del HDC1080 deben comprobarse en cada equipo. El firmware no convierte este prototipo en un instrumento meteorológico o acústico certificado.
 
@@ -38,9 +94,9 @@ La versión 4.1.1 usa tareas independientes de lectura y red, hasta cuatro desti
 
 La pulsación de 10 segundos primero pasa por la acción de 4 segundos. La cuenta de recuperación comienza al llegar a los 10 segundos. Mantener el botón no renueva continuamente el plazo. Al soltarlo no se genera un clic adicional.
 
-**AP:** `TARS-{identificador}` o `TARS-NEW-{sufijo MAC}`. **Dirección:** `http://192.168.4.1`. **Clave inicial del AP:** `tars12345678`. **Panel:** usuario `admin`, misma contraseña del AP. Se puede cambiar desde el panel; una clave vacía conserva la existente. Las versiones 4.0.2–4.0.4 aplicaban una migración única de esa clave; 4.1.1 conserva las claves ya guardadas.
+**AP:** `TARS-{identificador}` o `TARS-NEW-{sufijo MAC}`. **Dirección:** `http://192.168.4.1`. **Clave inicial del AP:** `tars12345678`. **Panel:** usuario `admin`, misma contraseña del AP. Se puede cambiar desde el panel; una clave vacía conserva la existente. Las versiones 4.0.2–4.0.4 aplicaban una migración única de esa clave; 4.1.2 conserva las claves ya guardadas.
 
-Tras vincular con AMERI, el servidor entrega una **clave individual** de mantenimiento. La clave común es solamente inicial. La actualización 4.1.1 conserva las claves existentes; no las vuelve a poner en el valor de fábrica.
+Tras vincular con AMERI, el servidor entrega una **clave individual** de mantenimiento. La clave común es solamente inicial. La actualización 4.1.2 conserva las claves existentes; no las vuelve a poner en el valor de fábrica.
 
 El AP forzado usa AP+STA: conserva la conexión principal y no cambia sus credenciales. Cuando termina el plazo, cierra AP y panel. El modo normal retira el AP si vuelve la conexión principal; el modo forzado lo mantiene hasta que expire o se cierre. Una carga OTA en curso pospone los cambios de interfaz; el plazo de mantenimiento sigue vigente.
 
@@ -147,7 +203,7 @@ CPU 80 MHz por defecto, ahorro WiFi, brillo OLED 32/255 y apagado a los 60 s de 
 
 ## Fotografías y hardware
 
-Fotografías reales ya incluidas en el proyecto; muestran revisiones anteriores y no son capturas de validación del firmware 4.1.1.
+Fotografías reales ya incluidas en el proyecto; muestran revisiones anteriores y no son capturas de validación del firmware 4.1.2.
 
 <table><tr><td><img src="docs/3-tars.jpg" alt="Lote de TARS" width="330"/></td><td><img src="docs/2-pcbv1.jpg" alt="PCB y conexiones de una revisión anterior" width="330"/></td></tr><tr><td><img src="docs/8-carcasa.jpg" alt="Carcasa TARS" width="330"/></td><td><img src="docs/6-pcbv2.jpg" alt="PCB experimental" width="330"/></td></tr></table>
 

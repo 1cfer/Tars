@@ -12,7 +12,7 @@ bool lowerHex(const String&s,size_t n){if(s.length()!=n)return false;for(char c:
 bool deviceId(const String&s){if(!s.length()||s.length()>24||s=="new")return false;for(char c:s)if(!((c>='a'&&c<='z')||(c>='0'&&c<='9')||c=='_'||c=='-'))return false;return true;}
 String anchor(const Config&c){return sha(c.id+"\n"+WiFi.macAddress()+"\n"+c.controlUrl+"\n"+c.controlKey);}
 String sign(const String&code,const String&id,const String&nonce,const String&payload){String canonical="ameri-pairing-1\n"+id+"\n"+nonce+"\n"+sha(payload);uint8_t bytes[32];if(mbedtls_md_hmac(mbedtls_md_info_from_type(MBEDTLS_MD_SHA256),reinterpret_cast<const uint8_t*>(code.c_str()),code.length(),reinterpret_cast<const uint8_t*>(canonical.c_str()),canonical.length(),bytes)!=0)return "";return hex(bytes,32);}
-bool saveJournal(JsonDocument&d){String raw;serializeJson(d,raw);if(raw.length()>4096||pairing.putString("pending",raw)!=raw.length())return false;journal=raw;return true;}
+bool saveJournal(JsonDocument&d){String raw;serializeJson(d,raw);if(raw.length()>4096||pairing.putString("pending",raw)!=raw.length()){pausePersistence("pairing_journal_failed");return false;}journal=raw;return true;}
 bool purge(){if(!journal.length())return true;if(!pairing.remove("pending"))return false;journal="";return true;}
 void fail(const String&why){Lock lock;result=why;state=purge()?"failed":"cleanup_required";}
 bool isCommitted(JsonDocument&d,const Config&c){return c.controlKey.length()&&d["commit_anchor"].is<String>()&&equal(d["commit_anchor"].as<String>(),anchor(c));}
@@ -44,9 +44,9 @@ String otaBase(const Config&c){Lock lock;JsonDocument d;if(sidecar.length()&&ame
 bool storeOtaBinding(const Config&c,const String&base,String&error){Lock lock;if(!ready||!validUrl(base,true)){error="pairing_storage_unavailable";return false;}
  JsonDocument d;if(!ameriParseObject(d,journal)){error="pairing_pending_missing";return false;}d["commit_anchor"]=anchor(c);if(!saveJournal(d)){error="pairing_prepare_failed";return false;}
  JsonDocument extension;extension["base"]=base;extension["anchor"]=anchor(c);String raw;serializeJson(extension,raw);
- if(pairing.putString("ota_binding",raw)!=raw.length()){error="ota_binding_storage_failed";return false;}sidecar=raw;return true;
+ if(pairing.putString("ota_binding",raw)!=raw.length()){error="ota_binding_storage_failed";pausePersistence("ota_binding_storage_failed");return false;}sidecar=raw;return true;
 }
-bool startPairing(const String&body,String&error){Lock lock;if(!ready){error="pairing_storage_unavailable";return false;}if(body.length()>1536){error="request_too_large";return false;}
+bool startPairing(const String&body,String&error){Lock lock;if(persistenceFault()){error="persistence_paused";return false;}if(!ready){error="pairing_storage_unavailable";return false;}if(body.length()>1536){error="request_too_large";return false;}
  JsonDocument p;if(!ameriParseObject(p,body)||p.size()!=5||!p["device_id"].is<String>()||!p["control_base_url"].is<String>()||!p["pairing_code"].is<String>()||!p["add_history"].is<bool>()||!p["expected_config_version"].is<uint32_t>()){error="invalid_pairing_fields";return false;}
  if(config.controlKey.length()){error="already_bound_use_update_config";return false;}
  if(p["expected_config_version"].as<uint32_t>()!=config.version){error="version_conflict_reload";return false;}
@@ -63,7 +63,7 @@ bool startPairing(const String&body,String&error){Lock lock;if(!ready){error="pa
  String raw;serializeJson(req,raw);JsonDocument record;record["request_json"]=raw;record["base"]=base;record["add_history"]=p["add_history"].as<bool>();record["created_at"]=int64_t(time(nullptr));record["first_attempt_at"]=int64_t(0);
  if(!saveJournal(record)){error="pairing_request_not_persisted";return false;}bootStarted=nowUs();nextAttempt=0;lastHttp=0;state="pending";result="request_saved";return true;
 }
-void pairingTick(const Config&c){String saved;{Lock lock;if(!ready||!journal.length())return;saved=journal;}
+void pairingTick(const Config&c){if(persistenceFault())return;String saved;{Lock lock;if(!ready||!journal.length())return;saved=journal;}
  JsonDocument record;if(!ameriParseObject(record,saved)){fail("invalid_pending_state");return;}
  if(isCommitted(record,c)){Lock lock;boundId=c.id;state=purge()?"saved":"cleanup_required";return;}
  if(c.controlKey.length()){fail("already_bound_use_update_config");return;}

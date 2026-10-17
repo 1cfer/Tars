@@ -26,8 +26,8 @@ step(74200000,false);step(74260000,false);assert.equal(ctx.page,4,'release after
 
 const m=fs.readFileSync(path.join(__dirname,'../firmware/TARS/TarsMaintenance.cpp'),'utf8');
 let loop=m.slice(m.indexOf('void maintenanceLoop(){'),m.lastIndexOf('\n}')).replace('void maintenanceLoop()','function maintenanceLoop()').replace('uint32_t seconds=','let seconds=').replace('uint64_t end=','let end=').replace('static uint64_t nextAp=0;','').replace('bool force=','let force=').replaceAll('0x80000000U','0x80000000').replaceAll('0x7fffffffU','0x7fffffff');
-const a={requestedMaintenance:0,UINT32_MAX:4294967295,time:0,until:0,nextAp:0,connected:false,WL_CONNECTED:3,maintenanceAp:false,forcedAp:false,localUpload:false,rebootAt:0,opens:0,closes:0};
-a.nowUs=()=>a.time;a.deadline=()=>a.until;a.maintenanceActive=()=>a.until>a.time;a.WiFi={status:()=>a.connected?3:0};a.stopAp=()=>a.maintenanceAp=false;a.startAp=()=>a.maintenanceAp=true;a.close=()=>{a.closes++;a.until=0;a.maintenanceAp=false;a.forcedAp=false};a.open=(n,force=false)=>{a.opens++;a.until=a.time+n*1e6;a.forcedAp=force;a.maintenanceAp=force||!a.connected};a.web={handleClient(){}};a.ESP={restart(){throw Error('unexpected restart')}};
+const a={fault:false,persistenceFault:()=>a.fault,requestedMaintenance:0,UINT32_MAX:4294967295,time:0,until:0,nextAp:0,connected:false,WL_CONNECTED:3,maintenanceAp:false,forcedAp:false,localUpload:false,rebootAt:0,opens:0,closes:0};
+a.nowUs=()=>a.time;a.deadline=(value)=>{if(value!==undefined)a.until=value;return a.until;};a.maintenanceActive=()=>a.until>a.time;a.WiFi={status:()=>a.connected?3:0};a.stopAp=()=>a.maintenanceAp=false;a.startAp=()=>a.maintenanceAp=true;a.close=()=>{a.closes++;a.until=0;a.maintenanceAp=false;a.forcedAp=false};a.open=(n,force=false)=>{a.opens++;a.until=a.time+n*1e6;a.forcedAp=force;a.maintenanceAp=force||!a.connected};a.web={handleClient(){}};a.ESP={restart(){throw Error('unexpected restart')}};
 vm.createContext(a);vm.runInContext(loop,a);
 a.maintenanceLoop();assert(!a.maintenanceAp);assert.equal(a.opens,0);
 a.connected=true;a.requestedMaintenance=600;a.maintenanceLoop();assert(!a.maintenanceAp);const end=a.until;
@@ -43,3 +43,5 @@ a.connected=false;a.time+=10000000;a.maintenanceLoop();assert(a.maintenanceAp);a
 a.time=forcedEnd;a.maintenanceLoop();assert(!a.maintenanceAp&&!a.forcedAp);assert.equal(a.until,0);
 a.requestedMaintenance=(600|0x80000000)>>>0;a.maintenanceLoop();assert(a.maintenanceAp);a.requestedMaintenance=a.UINT32_MAX;a.maintenanceLoop();assert(!a.maintenanceAp&&!a.forcedAp);
 console.log('PASS: physical 10 s gesture fires once; release does not navigate; forced AP survives connection/reconnection; expiration and explicit close remove it.');
+
+a.fault=true;a.time+=1000000;a.maintenanceLoop();assert(a.maintenanceAp&&a.forcedAp);let held=a.until;a.time=held+100;a.maintenanceLoop();assert(a.maintenanceAp&&a.until>a.time);a.fault=false;a.time=a.until;a.maintenanceLoop();assert(!a.maintenanceAp);console.log("PASS: persistence fault retains recovery AP beyond timeout; recovery permits normal expiry.");

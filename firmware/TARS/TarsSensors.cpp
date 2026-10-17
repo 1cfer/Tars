@@ -34,22 +34,29 @@ void readSensors(const Config&c){
 }
 // Todas las operaciones I2C y los cambios de CPU se hacen desde el propietario del bus.
 // El driver original no informa del resultado de cada transferencia del framebuffer.
+uint8_t shown[1024];bool shownValid=false;
 bool flushOled(){
- const uint8_t addressing[]={0x20,0x00,0x21,0,127,0x22,0,7};
+ uint8_t*buffer=oled.getBuffer();
  for(unsigned attempt=0;attempt<2;++attempt){
-  Wire.beginTransmission(oledAddress);Wire.write(uint8_t(0x00));Wire.write(addressing,sizeof addressing);
-  bool ok=Wire.endTransmission()==0;
-  uint8_t*buffer=oled.getBuffer();
-  for(size_t off=0;ok&&off<1024;off+=16){
-   Wire.beginTransmission(oledAddress);Wire.write(uint8_t(0x40));
-   size_t written=Wire.write(buffer+off,16);int error=Wire.endTransmission();ok=written==16&&error==0;
+  bool ok=true;
+  for(unsigned row=0;ok&&row<8;++row){
+   size_t base=row*128,first=0,last=128;
+   if(shownValid){while(first<last&&buffer[base+first]==shown[base+first])++first;while(last>first&&buffer[base+last-1]==shown[base+last-1])--last;}
+   if(first==last)continue;
+   const uint8_t addressing[]={0x20,0x00,0x21,uint8_t(first),uint8_t(last-1),0x22,uint8_t(row),uint8_t(row)};
+   Wire.beginTransmission(oledAddress);Wire.write(uint8_t(0x00));Wire.write(addressing,sizeof addressing);ok=Wire.endTransmission()==0;
+   for(size_t off=first;ok&&off<last;off+=16){
+    size_t length=min(size_t(16),last-off);Wire.beginTransmission(oledAddress);Wire.write(uint8_t(0x40));
+    size_t written=Wire.write(buffer+base+off,length);int error=Wire.endTransmission();ok=written==length&&error==0;
+   }
   }
-  if(ok)return true;
-  delay(5);
+  if(ok){memcpy(shown,buffer,sizeof shown);shownValid=true;return true;}
+  shownValid=false;delay(5); // Un NACK invalida la copia; reintentar imagen completa.
  }
- static uint64_t lastError=0;if(!lastError||nowUs()-lastError>=10000000){lastError=nowUs();Serial.println("[OLED] Error I2C enviando imagen; revisar alimentacion y conexiones.");}
+ static uint64_t lastError=0;uint64_t errorNow=nowUs();if(!lastError||(errorNow>=lastError&&errorNow-lastError>=10000000)){lastError=errorNow;Serial.println("[OLED] I2C: revisar alimentacion y conexiones.");}
  return false;
 }
+
 void label(int y,const char*name,float value,const char*unit,int digits=1){oled.setTextSize(1);oled.setCursor(0,y);oled.print(name);oled.setCursor(58,y);if(isfinite(value))oled.print(value,digits);else oled.print("--");oled.print(unit);}
 void draw(const Config&c){
  Reading r;Delivery d[DESTINATIONS];{Lock lock;r=reading;memcpy(d,delivery,sizeof d);}
@@ -98,7 +105,7 @@ void beginSensors(){
  oledOK=(screen3c||screen3d)&&oled.begin(SSD1306_SWITCHCAPVCC,screenAddress,true,false);
  Serial.printf("[OLED] SSD1306 128x64 direccion=0x%02X resultado=%s\n",screenAddress,oledOK?"INICIALIZADO":"NO DETECTADO / SIN MEMORIA");
  if(oledOK){oled.clearDisplay();oled.setTextColor(SSD1306_WHITE);oled.setTextSize(2);oled.setCursor(0,0);oled.print("TARS");
-  oled.setTextSize(1);oled.setCursor(0,25);oled.print("Arranque 4.1.1");oled.setCursor(0,40);oled.print("Inicializando...");flushOled();}
+  oled.setTextSize(1);oled.setCursor(0,25);oled.print("Arranque 4.1.6");oled.setCursor(0,40);oled.print("Inicializando...");flushOled();}
  checkHdc();Serial.printf("[HDC1080] %s\n",hdcOK?"OK":"No identificado");
  Wire.beginTransmission(0x40);Wire.write(2);Wire.write(0);Wire.write(0);Wire.endTransmission();
  boot=randomHex(16);intervalStart=nowUs();interaction=intervalStart;

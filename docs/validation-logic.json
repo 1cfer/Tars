@@ -1,5 +1,5 @@
 {
-  "firmware": "4.1.1",
+  "firmware": "4.1.6",
   "pairing_source_derived_guards": "passed_with_mocked_Arduino_types",
   "oled_and_button_logic": "passed",
   "server_public_hmac_vectors": "passed",
@@ -17,5 +17,24 @@
   "keyrock_physical_tested": false,
   "sound_transfer_source_derived_tests": "passed",
   "noise_receiver_temporary_db_integration": "passed",
-  "physical_acoustic_calibration_tested": false
+  "physical_acoustic_calibration_tested": false,
+  "network_idle_scheduling_regression": "passed_model_and_source_guards",
+  "physical_pairing_watchdog_fix_verified": false,
+  "tls_capture_before_cleanup": "passed_source_derived_mock",
+  "oled_differential_updates": "passed_source_derived_mock",
+  "status_log_deadline": "passed_source_derived_mock",
+  "physical_tls_failure_identified": false,
+  "physical_oled_visual_tested": false,
+  "tcp_tls_one_shot_probe": "retired_after_414_diagnostic",
+  "http_tls_client_identity": "runtime_guard_present_and_source_checked",
+  "same_ca_and_hostname": "source_derived_mock_verified",
+  "sha_helper_gzip_and_hash_vectors": "passed",
+  "private_config_compaction": "passed_source_derived_differential_test",
+  "config_storage_failure_injection": "passed_write_commit_readback_type_truncation_nul_oom",
+  "public_config_contract_unchanged": true,
+  "physical_config_storage_verified": false,
+  "tls_after_cpu_240": "user_reported_HTTP_200_and_signed_response_reached_config_commit",
+  "config_blob_storage": "passed_source_derived_native_API_mock",
+  "legacy_config_import_and_backup_priority": "passed_mock",
+  "ota_pending_gate_and_downgrade_floor": "passed_source_derived_mock_and_both_OTA_path_guards"
 }

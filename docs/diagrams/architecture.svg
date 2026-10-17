@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="750" viewBox="0 0 1200 750" role="img"><title>TARS · arquitectura 4.1.1</title><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#64748b"/></marker></defs><rect width="1200" height="750" rx="24" fill="#f8fafc"/>
-<text x="45" y="52" font-family="Arial,Helvetica,sans-serif" font-size="30" fill="#0f172a">TARS · arquitectura 4.1.1</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="750" viewBox="0 0 1200 750" role="img"><title>TARS · arquitectura 4.1.6</title><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#64748b"/></marker></defs><rect width="1200" height="750" rx="24" fill="#f8fafc"/>
+<text x="45" y="52" font-family="Arial,Helvetica,sans-serif" font-size="30" fill="#0f172a">TARS · arquitectura 4.1.6</text>
 <text x="45" y="84" font-family="Arial,Helvetica,sans-serif" font-size="16" fill="#475569">Lectura independiente · ventanas de muestras · cuatro destinos HTTPS · mantenimiento temporal</text>
 <rect x="40" y="130" width="280" height="170" rx="14" fill="#fff" stroke="#cbd5e1" stroke-width="2"/>
 <text x="58" y="162" font-family="Arial,Helvetica,sans-serif" font-size="20" fill="#0f172a">Sensores</text>

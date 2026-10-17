@@ -31,9 +31,9 @@ uint64_t nowUs();String hex(const uint8_t*,size_t);String sha(const String&);Str
 bool clockReady();bool validUrl(const String&,bool base=false);bool validHeader(const String&);
 Config snapshot();uint32_t configVersion();bool loadConfig();bool applyConfig(const String&,String&);String configJson(const Config&,bool secrets);
 String diagnostics();String manifest();void beginSensors();void sensorTask(void*);
-void beginNetwork();void networkTask(void*);bool enqueue(const String&);uint32_t pendingCount();bool persistBoundary();
+void requestNetworkProbe();void beginNetwork();void networkTask(void*);bool enqueue(const String&);uint32_t pendingCount();bool persistBoundary();
 void beginMaintenance();void maintenanceLoop();bool maintenanceActive();uint32_t maintenanceRemaining();
-void controlTick(const Config&);void networkSuccess(bool control,unsigned slot,uint32_t version);void configTick();bool configProbation();
+void controlTick(const Config&);void networkSuccess(bool control,unsigned slot,uint32_t version);void configTick();bool configProbation();void pausePersistence(const char*);bool persistenceFault();String persistenceStatus();bool recoverPersistence(String&);bool acceptsConfigFirmware(const char*);
 bool commitPairing(const String&,bool,String&);
 void beginPairing();bool startPairing(const String&,String&);void pairingTick(const Config&);String pairingStatus();void pairingControlSeen(const Config&);String otaBase(const Config&);bool storeOtaBinding(const Config&,const String&,String&);
 void requestMaintenance(uint32_t);void requestRecovery(uint32_t);void oledPage();String buildPayload(const Config&,const Reading&,uint32_t,const String&,uint64_t,uint32_t,const uint32_t*);
